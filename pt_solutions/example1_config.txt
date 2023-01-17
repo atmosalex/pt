@@ -1,0 +1,31 @@
+#Copy and paste this file to the directory containing pt_handler.py to resume this simulation
+species,p
+orbit,b
+duration to solve,0.0
+store trajectory,y
+store GC,n
+find initial K,n
+re-calculate invariants,n
+year,2015
+month,1
+day,1
+lmin,2.0
+lmax,2.0
+lsize,1
+amin,85.0
+amax,17.0
+asize,3
+logmumin,2.0
+logmumax,2.0
+dlogmu,1
+nphase_gyro,1
+nphase_bounce,1
+nphase_drift,1
+iphase_gyro,0.25
+iphase_bounce,0.0
+iphase_drift,0.0
+fieldpath,
+emin,0.1
+emax,400.0
+skipeveryn,10
+continuefrom,./pt_solutions/pt_20230117-105105_solutions.h5

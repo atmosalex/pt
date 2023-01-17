@@ -1,0 +1,48 @@
+#protons: p, electrons: e
+species, p
+
+#bounce: b, drift: d, time: t
+orbit, d
+
+#if specifying 't' orbit, specify the duration, otherwise ignored:
+duration to solve, 0
+
+store trajectory, y
+store GC, y
+find initial K, n
+re-calculate invariants, n
+
+#epoch of IGRF coefficients used to calculate dipole field moment:
+year,2015
+month,1
+day,1
+
+lmin, 2.0
+lmax, 2.0
+lsize, 1
+
+amin, 88
+amax, 88
+asize, 1
+
+logmumin, 2.
+logmumax, 2.
+dlogmu, 1
+
+nphase_gyro, 1
+nphase_bounce, 1
+nphase_drift, 3
+
+# 0 - 1
+iphase_gyro, 0.25
+iphase_bounce, 0
+iphase_drift, 0
+
+fieldpath, 
+
+emin, 0.1
+emax, 400
+
+skipeveryn, 20
+
+continuefrom,
