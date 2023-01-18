@@ -89,7 +89,7 @@ Sets up a grid in the L coordinate to populate with particles. The parameter val
 
 **asize**
 
-Sets up a grid in the equatorial pitch angle coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of degrees i.e. **90**, **90**, **1** to consider equatorially mirroring particles only, or **10.0, 90.0**, **11** to evenly space particles between aeq=10 and aeq=90 at 10 coordinates.
+Sets up a grid in the equatorial pitch angle coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of degrees i.e. **90**, **90**, **1** to consider equatorially mirroring particles only, or **10.0, 90.0**, **11** to evenly space particles between aeq=10 and aeq=90 at 11 coordinates.
 
 **logmumin**
 
