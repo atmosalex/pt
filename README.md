@@ -121,11 +121,11 @@ Optional. An experimental feature that can be used to load in time-varying elect
 
 **emax**
 
-Controls the maximum and minimum energy of particles to consider. The parameter values must be float, float respectively with units MeV i.e. 10, 500 to skip any calculation below 10MeV or above 500MeV.
+Controls the maximum and minimum energy of particles to consider. The parameter values must be float, float respectively with units MeV i.e. **10**, **500** to skip any calculation below 10MeV or above 500MeV.
 
 **skipeveryn**
 
-Controls the number of trajectory points to be stored in any output file. The parameter value must be an integer. Setting this above 1 will cause only every nth point to be output, useful to reducing the size of trajectory files. A recommended value is 10.
+Controls the number of trajectory points to be stored in any output file. The parameter value must be an integer. Setting this above 1 will cause only every nth point to be output, useful to reducing the size of trajectory files. A recommended value is **10** or higher.
 
 **continuefrom**
 
