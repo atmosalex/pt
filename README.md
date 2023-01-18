@@ -95,7 +95,7 @@ Sets up a grid in the equatorial pitch angle coordinate to populate with particl
 
 **dlogmu**
 
-Sets up a grid in the mu coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of log10(mu / 1MeV/G) i.e. **2**, **2**, **1** to consider 100MeV/G particles only, or **2, 3**, **11** to evenly space particles between mu=100MeV/G and mu=1000MeV/G at 11 coordinates.
+Sets up a grid in the mu coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of log10(mu / 1MeV/G) i.e. **2**, **2**, **1** to consider 100MeV/G particles only, or **2, 3**, **11** to log space particles between mu=100MeV/G and mu=1000MeV/G at 11 coordinates.
 
 **nphase\_gyro**
 
