@@ -33,9 +33,7 @@ A configuration file is formatted like a CSV file with each line following the s
 where **keyword** is a string, typed without quotation marks, describing some physical parameter, and **parameter** is some value assigned to the variable represented by **keyword**. Blank lines and lines beginning with # are ignored.
 
 
-Keywords can appear in any order, but all of the following keywords must be present:
-
-**species**, **orbit**, **duration to solve**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **lmin**, **lmax**, **lsize**, **amin**, **amax**, **asize**, **logmumin**, **logmumax**, **dlogmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **fieldpath**, **emin**, **emax**, **skipeveryn**, **continuefrom**.
+Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **lmin**, **lmax**, **lsize**, **amin**, **amax**, **asize**, **logmumin**, **logmumax**, **dlogmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **fieldpath**, **emin**, **emax**, **skipeveryn**, **continuefrom**.
 
 The meaning of each keyword is indicated below, and examples of acceptable parameter values are indicated for each in bold font. Specifying a parameter value is optional for some keywords even though each keyword must appear, and in this case **parameter** can be let blank.
 
