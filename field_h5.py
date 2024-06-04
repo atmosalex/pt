@@ -216,7 +216,7 @@ class HDF5_field:
             return q
 
 
-    def print_file_tree(self):
-        import nexusformat.nexus as nx
-        f = nx.nxload(self.filepath)
-        print(f.tree)
+    # def print_file_tree(self):
+    #     import nexusformat.nexus as nx
+    #     f = nx.nxload(self.filepath)
+    #     print(f.tree)

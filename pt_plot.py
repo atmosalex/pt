@@ -9,7 +9,6 @@ import random
 from mpl_toolkits.mplot3d import Axes3D
 import numpy.linalg as linalg
 from matplotlib import animation
-from pyIGRF.loadCoeffs import get_coeffs
 import datetime
 import argparse
 
@@ -259,7 +258,7 @@ ptids = resultfile.get_solved_ids()
 tracklist = resultfile.get_existing_tracklist()
 
 #
-resultfile.print_file_tree()
+#resultfile.print_file_tree()
 #
 
 

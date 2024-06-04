@@ -8,7 +8,7 @@ import argparse
 import os
 from pathlib import Path
 # Groups work like dictionaries, and datasets work like NumPy arrays
-from pyIGRF import calculate
+#from pyIGRF import calculate
 from math import pi
 MeV2J = pt_tools.constants.MeV2J
 G2T = pt_tools.constants.G2T

@@ -1,5 +1,6 @@
 import numpy as np
-from pyIGRF.loadCoeffs import get_coeffs
+#from pyIGRF.loadCoeffs import get_coeffs
+import pyIGRF
 from datetime import datetime
 import math
 from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
@@ -7,6 +8,7 @@ import sys
 import h5py
 import field_h5
 import field_tools
+from scipy import interpolate
 #from scipy.interpolate import RegularGridInterpolator 
 
 verbose = True
@@ -41,6 +43,28 @@ class WGS84:
     e = sqrt(f * (2 - f))
     #as a matrix
     M = np.array([[1/(a**2),0,0],[0,1/(a**2),0],[0,0,1/(b**2)]])
+
+def arrange_IGRF_coeffs(coeffs):
+    N = 13
+    g = np.ones((N+1, N+1)) * np.nan
+    h = np.ones((N+1, N+1)) * np.nan
+    idx = 0
+    for n in range(1, N + 1):
+        # n, m=0
+        m = 0
+        g[n, m] = coeffs[idx]
+        # print("g,{},{},{}".format(n,m,coeffs[idx]))
+        idx += 1
+        for m in range(1, n + 1):
+            # n, m=1 to n-1
+            g[n, m] = coeffs[idx]
+            # print("g,{},{},{}".format(n,m,coeffs[idx]))
+            idx += 1
+            h[n, m] = coeffs[idx]
+            # print("h,{},{},{}".format(n,m,coeffs[idx]))
+            idx += 1
+
+    return g, h
 
 class WGS84_atm:
     """General parameters defined by the WGS84 system...
@@ -102,7 +126,9 @@ class Dipolefield:
 
     def get_B0_m(self, year):
         """Get the average dipole field strength around Earth's equator and dipole moment. Use like so: B0,m = get_B0_m(2000.0)"""
-        g, h = get_coeffs(year)
+        #g, h = get_coeffs(year)
+        f = interpolate.interp1d(pyIGRF.igrf.time, pyIGRF.igrf.coeffs, fill_value='extrapolate')
+        g, h = arrange_IGRF_coeffs(f(year))
 
         B0_2 = g[1][0]**2 + g[1][1]**2 + h[1][1]**2
         B0_ = sqrt(B0_2)
@@ -113,8 +139,9 @@ class Dipolefield:
 
     def get_eccentric_centre_GEO(self):
         """return vector from 0 to eccentric dipole centre in GEO frame [m] """
-
-        g, h = get_coeffs(self.year_dec)
+        #g, h = get_coeffs(self.year_dec)
+        f = interpolate.interp1d(pyIGRF.igrf.time, pyIGRF.igrf.coeffs, fill_value='extrapolate')
+        g, h = arrange_IGRF_coeffs(f(year))
 
         L0 = 2*g[1][0]*g[2][0] + sqrt(3)*(g[1][1]*g[2][1] + h[1][1]*h[2][1])
         L1 = -g[1][1]*g[2][0] + sqrt(3)*(g[1][0]*g[2][1] + g[1][1]*g[2][2] + h[1][1]*h[2][2])
@@ -650,10 +677,10 @@ class HDF5_pt:
         fo.close()
         return group_names
         
-    def print_file_tree(self):
-        import nexusformat.nexus as nx
-        f = nx.nxload(self.filepath)
-        print(f.tree)
+    # def print_file_tree(self):
+    #     import nexusformat.nexus as nx
+    #     f = nx.nxload(self.filepath)
+    #     print(f.tree)
 
 
 #
