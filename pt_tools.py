@@ -1009,15 +1009,15 @@ class config_rw:
         self.year_kw = "year"
         self.month_kw = "month"
         self.day_kw = "day"
-        self.lmin_kw = "lmin"
-        self.lmax_kw = "lmax"
-        self.lsize_kw = "lsize"
+        self.lmin_kw = "Lmin"
+        self.lmax_kw = "Lmax"
+        self.nl_kw = "nL"
         self.amin_kw = "amin"
         self.amax_kw = "amax"
-        self.asize_kw = "asize"
+        self.na_kw = "na"
         self.logmumin_kw = "logmumin"
         self.logmumax_kw = "logmumax"
-        self.dlogmu_kw = "dlogmu"
+        self.nmu_kw = "nmu"
         self.nphase_gyro_kw = "nphase_gyro"
         self.nphase_bounce_kw = "nphase_bounce"
         self.nphase_drift_kw = "nphase_drift"
@@ -1049,15 +1049,15 @@ class config_rw:
 
             self.datadic[self.lmin_kw] = float(self.datadic[self.lmin_kw][0])
             self.datadic[self.lmax_kw] = float(self.datadic[self.lmax_kw][0])
-            self.datadic[self.lsize_kw] = int(self.datadic[self.lsize_kw][0])
+            self.datadic[self.nl_kw] = int(self.datadic[self.nl_kw][0])
 
             self.datadic[self.amin_kw] = float(self.datadic[self.amin_kw][0])
             self.datadic[self.amax_kw] = float(self.datadic[self.amax_kw][0])
-            self.datadic[self.asize_kw] = int(self.datadic[self.asize_kw][0])
+            self.datadic[self.na_kw] = int(self.datadic[self.na_kw][0])
 
             self.datadic[self.logmumin_kw] = float(self.datadic[self.logmumin_kw][0])
             self.datadic[self.logmumax_kw] = float(self.datadic[self.logmumax_kw][0])
-            self.datadic[self.dlogmu_kw] = int(self.datadic[self.dlogmu_kw][0])
+            self.datadic[self.nmu_kw] = int(self.datadic[self.nmu_kw][0])
 
             self.datadic[self.nphase_gyro_kw] = int(self.datadic[self.nphase_gyro_kw][0]) 
             self.datadic[self.nphase_bounce_kw] = int(self.datadic[self.nphase_bounce_kw][0])

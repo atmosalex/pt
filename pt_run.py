@@ -53,13 +53,13 @@ day = config.datadic[config.day_kw]
 dt = datetime(year, month, day)
 lmin = config.datadic[config.lmin_kw]
 lmax = config.datadic[config.lmax_kw]
-lsize = config.datadic[config.lsize_kw]
+nl = config.datadic[config.nl_kw]
 amin = config.datadic[config.amin_kw]
 amax = config.datadic[config.amax_kw]
-asize = config.datadic[config.asize_kw]
+na = config.datadic[config.na_kw]
 logmumin = config.datadic[config.logmumin_kw]
 logmumax = config.datadic[config.logmumax_kw]
-logmusize = config.datadic[config.dlogmu_kw]
+nmu = config.datadic[config.nmu_kw]
 nphase_gyro = config.datadic[config.nphase_gyro_kw]
 nphase_bounce = config.datadic[config.nphase_bounce_kw]
 nphase_drift = config.datadic[config.nphase_drift_kw]
@@ -119,9 +119,9 @@ if nphase_drift < 1: nphase_drift = 1
 #
 #   Generate a grid of invariant coordinates:
 #
-lr = np.linspace(lmin, lmax, lsize)
-ar = np.linspace(amin, amax, asize)
-mur = np.linspace(logmumin, logmumax, logmusize)
+lr = np.linspace(lmin, lmax, nl)
+ar = np.linspace(amin, amax, na)
+mur = np.linspace(logmumin, logmumax, nmu)
 mur = np.power(10*np.ones(mur.shape),mur)
 mur = mur[::-1] #reverse to start at higher energy and work down
 #phases to initialise between 0 and 1:
