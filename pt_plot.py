@@ -11,6 +11,8 @@ import numpy.linalg as linalg
 from matplotlib import animation
 import datetime
 import argparse
+import matplotlib
+mu_conv = pt_tools.constants.G2T/pt_tools.constants.MeV2J
 
 def colors(n, truerandom = False):
     """
@@ -261,6 +263,111 @@ tracklist = resultfile.get_existing_tracklist()
 #resultfile.print_file_tree()
 #
 
+axes_invariants_idx = [1, 2, 4]
+axes_invariants_idx = [4, 2, 1]
+axes_invariants_idx = [4, 1, 2]
+axes_invariants_idx = [4, 1, 3]
+axes_invariants_idx = [4, 0, 2]
+axes_invariants_labels = ['$\mu$ [MeV/G]',
+                          'E [MeV]',
+                          '$K$ [G$^{0.5}$R$_E$]',
+                          '$\\alpha_{\\mathrm{eq}}$ [$^{\circ}$]',
+                          '$L$']
+axes_invariants_logspace = [True,
+                            True,
+                            False,
+                            False,
+                            False]
+
+fig, ax = plt.subplots()
+colormap = plt.cm.jet  # or any other colormap
+
+xyc0 = []
+xyc1 = []
+# xyc0_lost = []
+for ptid in ptids:
+    checkcode = ptids[ptid]
+    if checkcode != 1:
+        # checkcode > 1 could be caused by a number of issues, see return statements in solve_trajectory(...)
+        print("pt ID {} has incorrect check code".format(ptid))
+        continue
+
+    #pg, pb, pd = tracklist[ptid][3:] #starting phases
+
+    time, pos = resultfile.read_track(ptid)
+    muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
+    muenKalphaL0[0] = muenKalphaL0[0] * mu_conv
+    muenKalphaL1[0] = muenKalphaL1[0] * mu_conv
+    muenKalphaL0[3] = muenKalphaL0[3] * 180/np.pi
+    muenKalphaL1[3] = muenKalphaL1[3] * 180/np.pi
+
+    if muenKalphaL1[2] < 0 and muenKalphaL1[0] > 0:
+        # K = -1 but mu, etc., is valid when bounce orbits could not correctly be ID'd
+        # however the particle may not have been 'lost'
+        print("pt ID {} has invalid K1".format(ptid))
+        # xyc0_lost.append([
+        #     muenKalphaL0[axes_invariants_idx[0]],
+        #     muenKalphaL0[axes_invariants_idx[1]],
+        #     muenKalphaL0[axes_invariants_idx[2]]])
+        continue
+    else:
+        xyc0.append([
+            muenKalphaL0[axes_invariants_idx[0]],
+            muenKalphaL0[axes_invariants_idx[1]],
+            muenKalphaL0[axes_invariants_idx[2]]])
+        xyc1.append([
+            muenKalphaL1[axes_invariants_idx[0]],
+            muenKalphaL1[axes_invariants_idx[1]],
+            muenKalphaL1[axes_invariants_idx[2]]])
+
+xyc0 = np.array(xyc0)
+xyc1 = np.array(xyc1)
+# xyc0_lost = np.array(xyc0_lost)
+
+cmin = min([min(xyc0[:,2]), min(xyc1[:,2])])#, min(xyc0_lost[:,2])])
+cmax = max([max(xyc0[:,2]), max(xyc1[:,2])])#, max(xyc0_lost[:,2])])
+if axes_invariants_logspace[axes_invariants_idx[2]]:
+    normfunc = matplotlib.colors.LogNorm
+else:
+    normfunc = matplotlib.colors.Normalize
+normalize = normfunc(vmin=cmin, vmax=cmax)
+fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=colormap), ax=ax, aspect=25, shrink=0.6, label=axes_invariants_labels[axes_invariants_idx[2]], pad=0., panchor=(0, 0.5))
+
+
+#plot changes in trapped coordinate:
+for idx in range(len(xyc0)):
+    x0, y0, c0 = xyc0[idx]
+    x1, y1, c1 = xyc1[idx]
+    arrowprops = dict(arrowstyle='<-', color=colormap(normalize(c0)), lw=0.75, ls='-')
+    arrowprops = dict(arrowstyle='<-', color='black', lw=0.5, ls='-')
+    #ax.scatter([x0, x1],[y0, y1], c=[colormap(normalize(c)) for c in [c0,c1]], marker='.', zorder=1)
+
+    ax.scatter([x1], [y1], color=colormap(normalize(c1)), marker='.', zorder=1)
+    ax.annotate('', xy=(x0, y0),
+                xycoords='data',
+                xytext=(x1, y1),
+                textcoords='data',
+                arrowprops=arrowprops,
+                zorder = 2)
+    #ax.scatter([x0], [y0], color='white', edgecolors='black', marker='.', zorder=3)
+    ax.scatter([x0], [y0], color=colormap(normalize(c0)), edgecolors='black', marker='.', zorder=3)
+
+# #plot lost coordinates:
+# colors = xyc0_lost[:,2]
+# colrgb_all = colormap(normalize(colors))
+# for idx in range(len(xyc0_lost)):
+#     x0, y0, c0 = xyc0[idx]
+#     ax.scatter([x0],[y0], color=colormap(normalize(c0)), marker='x')
+
+ax.set_xlabel(axes_invariants_labels[axes_invariants_idx[0]])
+ax.set_ylabel(axes_invariants_labels[axes_invariants_idx[1]])
+ax.set_xscale(['linear','log'][axes_invariants_logspace[axes_invariants_idx[0]]])
+ax.set_yscale(['linear','log'][axes_invariants_logspace[axes_invariants_idx[1]]])
+#plt.show()
+plt.savefig("Figure.png", dpi=200)
+
+
+sys.exit()
 
 for ptid in ptids:
     mu = tracklist[ptid][0]
@@ -272,10 +379,8 @@ for ptid in ptids:
     if checkcode == 0: continue
     time, pos = resultfile.read_track(ptid)
     muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
-    print(muenKalphaL0)
+    #print(muenKalphaL0)
 
-
-    mu_conv = pt_tools.constants.G2T/pt_tools.constants.MeV2J
 
     #print(muenKalphaL0[0]* mu_conv, muenKalphaL0[1:], muenKalphaL0[3]*180/pi)
 
@@ -301,14 +406,14 @@ for ptid in ptids:
     pos_ = pos[::skipeveryn_additionally]
     poslist.append(pos_)
 
-print()
-print("Printing 3D overview, click and drag to move around...")
-plot_positions(poslist, seeEarth = False, view_ele = 0, view_azi = -71)
-print()
-print("Printing 2D overview looking down towards Earth...")
-plot_positions2D_birdseye(poslist, seeEarth = True, ring = -1)
-print()
-print("Printing 2D overview side-on...")
-plot_positions2D_side(poslist, seeEarth = True, ring = -1)
+# print()
+# print("Printing 3D overview, click and drag to move around...")
+# plot_positions(poslist, seeEarth = False, view_ele = 0, view_azi = -71)
+# print()
+# print("Printing 2D overview looking down towards Earth...")
+# plot_positions2D_birdseye(poslist, seeEarth = True, ring = -1)
+# print()
+# print("Printing 2D overview side-on...")
+# plot_positions2D_side(poslist, seeEarth = True, ring = -1)
 
 

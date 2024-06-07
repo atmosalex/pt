@@ -459,7 +459,7 @@ def derive_invariants(particle, bfield):
     stored_times = copy.deepcopy(particle.times)
     stored_pt = copy.deepcopy(particle.pt)
 
-    #delete the entire track amd initialise from the last state vector:
+    #delete the entire track and initialise from the last state vector:
     particle.times = [t1]
     particle.pt = [[*x1, *p1]]
     #modify the particle to keep the track:
@@ -597,19 +597,6 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
     #   Place the particle:
     #
     particle.update(t0_init, [*x0_init, *p0_init])
-    #
-    # #test derive_invariants(...):
-    # mu_guess, K_guess, aeq_guess, L_guess = derive_invariants(particle, bfield)
-    # print(mu_guess*G2T/MeV2J)
-    # print(mu*G2T/MeV2J)
-    # print()
-    # print(K_guess)
-    # print(K_approx)
-    # print()
-    # print(L_guess)
-    # print(L)
-    # print()
-    # sys.exit(1)
 
     if nonmirroring:
         dt_solve_increment = tb_est #tb_estimate(np.linalg.norm(x0_GC), np.linalg.norm(v0), nonmirror_threshold * pi / 180)

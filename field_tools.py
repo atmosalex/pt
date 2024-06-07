@@ -146,9 +146,11 @@ def solvefield_pulse(pulse, fpath_sol, dur, resolution):
     # dyy = yy[0, 1, 0] - yy[0, 0, 0]
     # dzz = zz[0, 0, 1] - zz[0, 0, 0]
     #solution grids:
+    # electric field:
     sol_Ex = np.zeros((nt, nx, ny, nz))
     sol_Ey = np.zeros((nt, nx, ny, nz))
     sol_Ez = np.zeros((nt, nx, ny, nz))
+    # background perturbation in B:
     sol_Bwx = np.zeros((nt, nx, ny, nz))
     sol_Bwy = np.zeros((nt, nx, ny, nz))
     sol_Bwz = np.zeros((nt, nx, ny, nz))
