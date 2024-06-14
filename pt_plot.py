@@ -1,3 +1,5 @@
+import os.path
+
 import pt_tools
 import sys
 from math import pi, sqrt
@@ -157,7 +159,7 @@ def plot_positions(positionslist, seeEarth=True, filename=None, limit=-1, view_e
     plt.close()
 
 
-def plot_positions2D_birdseye(positionslist, seeEarth=True, filename=None, ring = -1):
+def plot_positions2D_birdseye(positionslist, seeEarth=True, filename=None, ring = -1, axlims = []):
     # set up figure and axes:
     fig, ax1 = plt.subplots()
 
@@ -176,20 +178,27 @@ def plot_positions2D_birdseye(positionslist, seeEarth=True, filename=None, ring 
     for idx, positions in enumerate(positionslist):
         #if idx==1:continue
         positions = positions / pt_tools.constants.RE
-        ax1.scatter(positions[:, 0], positions[:, 1], color=colours[idx], marker = ".", zorder=1)
+        #ax1.scatter(positions[:, 0], positions[:, 1], color=colours[idx], marker = ".", zorder=1, s=0.1)
+        ax1.plot(positions[:, 0], positions[:, 1], color=colours[idx], zorder=1, lw=0.25)
+        ax1.scatter([positions[0, 0], positions[-1, 0]], [positions[0, 1], positions[-1, 1]], c=['black', 'red'], marker=".", zorder=2, s=1)
 
     # axis labels:
     plt.xlabel('$X_{\mathrm{MAG}}$ [$R_{\mathrm{E}}$]')
     plt.ylabel('$Y_{\mathrm{MAG}}$ [$R_{\mathrm{E}}$]')
     ax1.axis('equal')
 
+    if len(axlims):
+        ax1.set_xlim(axlims[0])
+        ax1.set_ylim(axlims[1])
+
     if filename:
         plt.savefig(filename, dpi=300, facecolor='w', edgecolor='w', orientation='portrait')
     else:
         plt.show()
     plt.close()
+    return [ax1.get_xlim(), ax1.get_ylim()]
 
-def plot_positions2D_side(positionslist, seeEarth=True, filename=None, ring = -1):
+def plot_positions2D_side(positionslist, seeEarth=True, filename=None, ring = -1, axlims = []):
     # set up figure and axes:
     fig, ax1 = plt.subplots()
 
@@ -208,18 +217,25 @@ def plot_positions2D_side(positionslist, seeEarth=True, filename=None, ring = -1
     colours = colors(len(positionslist))
     for idx, positions in enumerate(positionslist):
         positions = positions / pt_tools.constants.RE
-        ax1.plot(-positions[:, 0], positions[:, 2], color=colours[idx], zorder=len(positionslist)-idx)
+        ax1.plot(positions[:, 0], positions[:, 2], color=colours[idx], zorder=len(positionslist)-idx)
+        ax1.scatter([positions[0, 0], positions[-1, 0]], [positions[0, 2], positions[-1, 2]], c=['black', 'red'],marker=".", zorder=1, s=1)
 
     # axis labels:
     plt.xlabel('$X_{\mathrm{MAG}}$ [$R_{\mathrm{E}}$]')
     plt.ylabel('$Z_{\mathrm{MAG}}$ [$R_{\mathrm{E}}$]')
-    ax1.axis('equal')
+    #ax1.axis('equal')
+
+    if len(axlims):
+        ax1.set_xlim(axlims[0])
+        ax1.set_ylim(axlims[1])
 
     if filename:
         plt.savefig(filename, dpi=300, facecolor='w', edgecolor='w', orientation='portrait')
     else:
         plt.show()
     plt.close()
+
+    return [ax1.get_xlim(), ax1.get_ylim()]
 
 
 
@@ -263,111 +279,113 @@ tracklist = resultfile.get_existing_tracklist()
 #resultfile.print_file_tree()
 #
 
-axes_invariants_idx = [1, 2, 4]
-axes_invariants_idx = [4, 2, 1]
-axes_invariants_idx = [4, 1, 2]
-axes_invariants_idx = [4, 1, 3]
-axes_invariants_idx = [4, 0, 2]
-axes_invariants_labels = ['$\mu$ [MeV/G]',
-                          'E [MeV]',
-                          '$K$ [G$^{0.5}$R$_E$]',
-                          '$\\alpha_{\\mathrm{eq}}$ [$^{\circ}$]',
-                          '$L$']
-axes_invariants_logspace = [True,
-                            True,
-                            False,
-                            False,
-                            False]
+def plot_invariants(axes_invariants_idx = [4, 0, 2], filename=None, axlims = []):
+    axes_invariants_labels = ['$\mu$ [MeV/G]',
+                              'E [MeV]',
+                              '$K$ [G$^{0.5}$R$_E$]',
+                              '$\\alpha_{\\mathrm{eq}}$ [$^{\circ}$]',
+                              '$L$']
+    axes_invariants_logspace = [True,
+                                True,
+                                False,
+                                False,
+                                False]
 
-fig, ax = plt.subplots()
-colormap = plt.cm.jet  # or any other colormap
 
-xyc0 = []
-xyc1 = []
-# xyc0_lost = []
-for ptid in ptids:
-    checkcode = ptids[ptid]
-    if checkcode != 1:
-        # checkcode > 1 could be caused by a number of issues, see return statements in solve_trajectory(...)
-        print("pt ID {} has incorrect check code".format(ptid))
-        continue
+    fig, ax = plt.subplots()
+    colormap = plt.cm.jet  # or any other colormap
 
-    #pg, pb, pd = tracklist[ptid][3:] #starting phases
+    xyc0 = []
+    xyc1 = []
+    # xyc0_lost = []
+    for ptid in ptids:
+        checkcode = ptids[ptid]
+        if checkcode != 1:
+            # checkcode > 1 could be caused by a number of issues, see return statements in solve_trajectory(...)
+            print("pt ID {} has incorrect check code".format(ptid))
+            continue
 
-    time, pos = resultfile.read_track(ptid)
-    muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
-    muenKalphaL0[0] = muenKalphaL0[0] * mu_conv
-    muenKalphaL1[0] = muenKalphaL1[0] * mu_conv
-    muenKalphaL0[3] = muenKalphaL0[3] * 180/np.pi
-    muenKalphaL1[3] = muenKalphaL1[3] * 180/np.pi
+        #pg, pb, pd = tracklist[ptid][3:] #starting phases
 
-    if muenKalphaL1[2] < 0 and muenKalphaL1[0] > 0:
-        # K = -1 but mu, etc., is valid when bounce orbits could not correctly be ID'd
-        # however the particle may not have been 'lost'
-        print("pt ID {} has invalid K1".format(ptid))
-        # xyc0_lost.append([
-        #     muenKalphaL0[axes_invariants_idx[0]],
-        #     muenKalphaL0[axes_invariants_idx[1]],
-        #     muenKalphaL0[axes_invariants_idx[2]]])
-        continue
+        time, pos = resultfile.read_track(ptid)
+        muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
+        muenKalphaL0[0] = muenKalphaL0[0] * mu_conv
+        muenKalphaL1[0] = muenKalphaL1[0] * mu_conv
+        muenKalphaL0[3] = muenKalphaL0[3] * 180/np.pi
+        muenKalphaL1[3] = muenKalphaL1[3] * 180/np.pi
+
+        if muenKalphaL1[2] < 0 and muenKalphaL1[0] > 0:
+            # K = -1 but mu, etc., is valid when bounce orbits could not correctly be ID'd
+            # however the particle may not have been 'lost'
+            print("pt ID {} has invalid K1".format(ptid))
+            # xyc0_lost.append([
+            #     muenKalphaL0[axes_invariants_idx[0]],
+            #     muenKalphaL0[axes_invariants_idx[1]],
+            #     muenKalphaL0[axes_invariants_idx[2]]])
+            continue
+        else:
+            xyc0.append([
+                muenKalphaL0[axes_invariants_idx[0]],
+                muenKalphaL0[axes_invariants_idx[1]],
+                muenKalphaL0[axes_invariants_idx[2]]])
+            xyc1.append([
+                muenKalphaL1[axes_invariants_idx[0]],
+                muenKalphaL1[axes_invariants_idx[1]],
+                muenKalphaL1[axes_invariants_idx[2]]])
+
+        print(muenKalphaL1)
+
+    xyc0 = np.array(xyc0)
+    xyc1 = np.array(xyc1)
+    # xyc0_lost = np.array(xyc0_lost)
+
+    cmin = min([min(xyc0[:,2]), min(xyc1[:,2])])#, min(xyc0_lost[:,2])])
+    cmax = max([max(xyc0[:,2]), max(xyc1[:,2])])#, max(xyc0_lost[:,2])])
+    if axes_invariants_logspace[axes_invariants_idx[2]]:
+        normfunc = matplotlib.colors.LogNorm
     else:
-        xyc0.append([
-            muenKalphaL0[axes_invariants_idx[0]],
-            muenKalphaL0[axes_invariants_idx[1]],
-            muenKalphaL0[axes_invariants_idx[2]]])
-        xyc1.append([
-            muenKalphaL1[axes_invariants_idx[0]],
-            muenKalphaL1[axes_invariants_idx[1]],
-            muenKalphaL1[axes_invariants_idx[2]]])
-
-xyc0 = np.array(xyc0)
-xyc1 = np.array(xyc1)
-# xyc0_lost = np.array(xyc0_lost)
-
-cmin = min([min(xyc0[:,2]), min(xyc1[:,2])])#, min(xyc0_lost[:,2])])
-cmax = max([max(xyc0[:,2]), max(xyc1[:,2])])#, max(xyc0_lost[:,2])])
-if axes_invariants_logspace[axes_invariants_idx[2]]:
-    normfunc = matplotlib.colors.LogNorm
-else:
-    normfunc = matplotlib.colors.Normalize
-normalize = normfunc(vmin=cmin, vmax=cmax)
-fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=colormap), ax=ax, aspect=25, shrink=0.6, label=axes_invariants_labels[axes_invariants_idx[2]], pad=0., panchor=(0, 0.5))
+        normfunc = matplotlib.colors.Normalize
+    normalize = normfunc(vmin=cmin, vmax=cmax)
+    fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=colormap), ax=ax, aspect=25, shrink=0.6, label=axes_invariants_labels[axes_invariants_idx[2]], pad=0., panchor=(0, 0.5))
 
 
-#plot changes in trapped coordinate:
-for idx in range(len(xyc0)):
-    x0, y0, c0 = xyc0[idx]
-    x1, y1, c1 = xyc1[idx]
-    arrowprops = dict(arrowstyle='<-', color=colormap(normalize(c0)), lw=0.75, ls='-')
-    arrowprops = dict(arrowstyle='<-', color='black', lw=0.5, ls='-')
-    #ax.scatter([x0, x1],[y0, y1], c=[colormap(normalize(c)) for c in [c0,c1]], marker='.', zorder=1)
+    #plot changes in trapped coordinate:
+    for idx in range(len(xyc0)):
+        x0, y0, c0 = xyc0[idx]
+        x1, y1, c1 = xyc1[idx]
+        arrowprops = dict(arrowstyle='<-', color=colormap(normalize(c0)), lw=0.75, ls='-')
+        arrowprops = dict(arrowstyle='<-', color='black', lw=0.5, ls='-')
+        #ax.scatter([x0, x1],[y0, y1], c=[colormap(normalize(c)) for c in [c0,c1]], marker='.', zorder=1)
 
-    ax.scatter([x1], [y1], color=colormap(normalize(c1)), marker='.', zorder=1)
-    ax.annotate('', xy=(x0, y0),
-                xycoords='data',
-                xytext=(x1, y1),
-                textcoords='data',
-                arrowprops=arrowprops,
-                zorder = 2)
-    #ax.scatter([x0], [y0], color='white', edgecolors='black', marker='.', zorder=3)
-    ax.scatter([x0], [y0], color=colormap(normalize(c0)), edgecolors='black', marker='.', zorder=3)
-
-# #plot lost coordinates:
-# colors = xyc0_lost[:,2]
-# colrgb_all = colormap(normalize(colors))
-# for idx in range(len(xyc0_lost)):
-#     x0, y0, c0 = xyc0[idx]
-#     ax.scatter([x0],[y0], color=colormap(normalize(c0)), marker='x')
-
-ax.set_xlabel(axes_invariants_labels[axes_invariants_idx[0]])
-ax.set_ylabel(axes_invariants_labels[axes_invariants_idx[1]])
-ax.set_xscale(['linear','log'][axes_invariants_logspace[axes_invariants_idx[0]]])
-ax.set_yscale(['linear','log'][axes_invariants_logspace[axes_invariants_idx[1]]])
-#plt.show()
-plt.savefig("Figure.png", dpi=200)
+        ax.scatter([x1], [y1], color=colormap(normalize(c1)), marker='.', zorder=1)
+        ax.annotate('', xy=(x0, y0),
+                    xycoords='data',
+                    xytext=(x1, y1),
+                    textcoords='data',
+                    arrowprops=arrowprops,
+                    zorder = 2)
+        #ax.scatter([x0], [y0], color='white', edgecolors='black', marker='.', zorder=3)
+        ax.scatter([x0], [y0], color=colormap(normalize(c0)), edgecolors='black', marker='.', zorder=3)
 
 
-sys.exit()
+    ax.set_xlabel(axes_invariants_labels[axes_invariants_idx[0]])
+    ax.set_ylabel(axes_invariants_labels[axes_invariants_idx[1]])
+    ax.set_xscale(['linear','log'][axes_invariants_logspace[axes_invariants_idx[0]]])
+    ax.set_yscale(['linear','log'][axes_invariants_logspace[axes_invariants_idx[1]]])
+    if len(axlims):
+        ax.set_xlim(axlims[0])
+        ax.set_ylim(axlims[1])
+
+    if filename:
+        plt.savefig(filename, dpi=300, facecolor='w', edgecolor='w', orientation='portrait')
+    else:
+        plt.show()
+    plt.close()
+
+    return [ax.get_xlim(), ax.get_ylim()]
+
+
+
 
 for ptid in ptids:
     mu = tracklist[ptid][0]
@@ -379,9 +397,14 @@ for ptid in ptids:
     if checkcode == 0: continue
     time, pos = resultfile.read_track(ptid)
     muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
-    #print(muenKalphaL0)
-
-
+    #print(muenKalphaL1)
+    final_logmu = np.log10(muenKalphaL1[0] * mu_conv)
+    final_aeq = muenKalphaL1[3]
+    final_L = muenKalphaL1[4]
+    final_iphase_g = muenKalphaL1[5]
+    final_iphase_b = muenKalphaL1[6]
+    final_iphase_d = muenKalphaL1[7]
+    print(final_logmu, final_aeq*180/np.pi, final_L, final_iphase_g, final_iphase_b, final_iphase_d)
     #print(muenKalphaL0[0]* mu_conv, muenKalphaL0[1:], muenKalphaL0[3]*180/pi)
 
     pre_pds.append(pd)
@@ -400,20 +423,28 @@ for ptid in ptids:
         post_aeqs.append(-1)
         post_Ks.append(-1)
     print()
-
     if len(time) < 2: skipeveryn_additionally = 1
     time_ = time[::skipeveryn_additionally]
     pos_ = pos[::skipeveryn_additionally]
     poslist.append(pos_)
 
-# print()
-# print("Printing 3D overview, click and drag to move around...")
-# plot_positions(poslist, seeEarth = False, view_ele = 0, view_azi = -71)
-# print()
-# print("Printing 2D overview looking down towards Earth...")
-# plot_positions2D_birdseye(poslist, seeEarth = True, ring = -1)
-# print()
-# print("Printing 2D overview side-on...")
-# plot_positions2D_side(poslist, seeEarth = True, ring = -1)
+plotname = os.path.basename(fileh5[:-3])
+
+axlims = plot_invariants(filename="Figure_adiabatics.png",
+                         axlims = [])
+print(axlims)
+#print()
+#print("Printing 3D overview, click and drag to move around...")
+#plot_positions(poslist, seeEarth = False, view_ele = 0, view_azi = -71)
+print()
+print("Printing 2D overview looking down towards Earth...")
+axlims = plot_positions2D_birdseye(poslist, seeEarth = False, ring = -1, filename="Figure_birdseye_{}.png".format(plotname),
+                                   axlims=[])
+print(axlims)
+
+print("Printing 2D overview side-on...")
+axlims = plot_positions2D_side(poslist, seeEarth = False, ring = -1, filename="Figure_side_{}.png".format(plotname),
+                               axlims=[])
+print(axlims)
 
 

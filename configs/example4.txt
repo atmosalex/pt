@@ -7,6 +7,8 @@ orbit, d
 #if specifying 't' orbit, specify the duration, otherwise ignored:
 duration to solve, 0
 
+reverse,n
+
 store trajectory, y
 store GC, y
 find initial K, n

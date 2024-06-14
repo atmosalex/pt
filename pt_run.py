@@ -47,6 +47,7 @@ storegc = config.datadic[config.storegc_kw]
 findK0 = config.datadic[config.findK0_kw]
 reevaluate_invariants = config.datadic[config.reeval_kw]
 duration_solve = config.datadic[config.duration_kw]
+reverse = config.datadic[config.reverse_kw]
 year = config.datadic[config.year_kw]
 month = config.datadic[config.month_kw]
 day = config.datadic[config.day_kw]
@@ -81,18 +82,18 @@ else:
     print("Error: particle species '{}' not recognised".format(particletype))
 
 if orbittype[0].lower() == "b":
-	print("Bounce mode")
-	call_to_solver = pt_fp.solve_trajectory_bounce
-	duration_solve = 0
+    print("Bounce mode")
+    call_to_solver = pt_fp.solve_trajectory_bounce
+    duration_solve = -1
 elif orbittype[0].lower() == "d":
-	print("Drift mode")
-	call_to_solver = pt_fp.solve_trajectory_drift
-	duration_solve = 0
+    print("Drift mode")
+    call_to_solver = pt_fp.solve_trajectory_drift
+    duration_solve = -1
 elif orbittype[0].lower() == "t":
-	print("Duration mode")
-	call_to_solver = pt_fp.solve_trajectory_time
+    print("Duration mode")
+    call_to_solver = pt_fp.solve_trajectory_time
 else:
-	print("Error: orbit type '{}' not recognised".format(orbittype))
+    print("Error: orbit type '{}' not recognised".format(orbittype))
 
 if storetrack[0].lower() == "y" or storetrack[0].lower() == "t":
     storetrack = True
@@ -110,6 +111,10 @@ if reevaluate_invariants[0].lower() == "y" or reevaluate_invariants[0].lower() =
     reevaluate_invariants = True
 else:
     reevaluate_invariants = False
+if reverse.lower() == "y":
+    reverse = True
+else:
+    reverse = False
 
 if nphase_gyro < 1: nphase_gyro = 1
 if nphase_bounce < 1: nphase_bounce = 1
@@ -210,10 +215,12 @@ checkcodes = resultfile.get_solved_ids()
 #   Instantiate magnetic field
 #
 if len(fieldpath): #include non-dipolar field perturbations and time variation from the file
-    bfield = pt_tools.Geofield(year_dec, fieldpath)
-    duration_field = bfield.field_time[-1] - 0.001 #deal with numerical interpolation errors
-    if duration_solve > duration_field:
-        print("Error: cannot solve for longer than the field is specified ({}s)".format(duration_field))
+    if reverse:
+        bfield = pt_tools.Geofield(year_dec, fieldpath, reversetime = duration_solve)
+    else:
+        bfield = pt_tools.Geofield(year_dec, fieldpath)
+    if duration_solve > bfield.field_time[-1]:
+        print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
         sys.exit(1)
 else:
     bfield = pt_tools.Dipolefield(year_dec)
@@ -239,12 +246,14 @@ for pt_id in tracklist_ID:
     mu = mu * MeV2J / G2T #change units of mu to SI
     pa = metadata['tracklist_pa'][pt_id]
     pa = pa * pi / 180 #change units of pi to radian
+    if pa > pt_fp.aeq_max_for_bounce_detection * pi / 180:
+        print("Warning: particle with aeq={}d has had pitch angle reduced to {}d".format(pa * 180/np.pi, pt_fp.aeq_max_for_bounce_detection))
+        pa = pt_fp.aeq_max_for_bounce_detection * pi / 180
     L = metadata['tracklist_L'][pt_id]
     phase_g = metadata['tracklist_pg'][pt_id]
     phase_b = metadata['tracklist_pb'][pt_id]
     phase_d = metadata['tracklist_pd'][pt_id]
 
-    #instantiate a particle:
     particle = Particle(mu, pa, L, phase_g, phase_b, phase_d, storetrack = storetrack)
 
     #
@@ -272,11 +281,11 @@ for pt_id in tracklist_ID:
         #code_success = pt_fp.solve_trajectory_bounce(particle, bfield, duration_solve, findK0 = findK0, storegc = storegc)
         #code_success = pt_fp.solve_trajectory_drift(particle, bfield, duration_solve, findK0 = findK0, storegc = storegc)
         #code_success = pt_fp.solve_trajectory_time(particle, bfield, duration_solve, findK0 = findK0, storegc = storegc)
-        code_success = call_to_solver(particle, bfield, duration_solve, findK0 = findK0, storegc = storegc)
+        code_success = call_to_solver(particle, bfield, duration_solve, findK0 = findK0, storegc = storegc, reverse = reverse)
 
         #code_success will not be 1 if the particle goes out of range of the fields
         if code_success == 1 and reevaluate_invariants: #this should work even when particle.storetrack = False
-            invariants_post = pt_fp.derive_invariants(particle, bfield)
+            invariants_post = pt_fp.derive_invariants(particle, bfield, reverse = reverse)
             particle.muenKalphaL[1,:] = invariants_post
 
         #code_success will not be 1 if storetrack is False and storegc is True

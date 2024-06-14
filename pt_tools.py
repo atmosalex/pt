@@ -141,7 +141,7 @@ class Dipolefield:
         """return vector from 0 to eccentric dipole centre in GEO frame [m] """
         #g, h = get_coeffs(self.year_dec)
         f = interpolate.interp1d(pyIGRF.igrf.time, pyIGRF.igrf.coeffs, fill_value='extrapolate')
-        g, h = arrange_IGRF_coeffs(f(year))
+        g, h = arrange_IGRF_coeffs(f(self.year_dec))
 
         L0 = 2*g[1][0]*g[2][0] + sqrt(3)*(g[1][1]*g[2][1] + h[1][1]*h[2][1])
         L1 = -g[1][1]*g[2][0] + sqrt(3)*(g[1][0]*g[2][1] + g[1][1]*g[2][2] + h[1][1]*h[2][2])
@@ -162,7 +162,7 @@ class Dipolefield:
         return constants.RE * np.array([eta, zeta, xi])
 
 class Geofield(Dipolefield):
-    def __init__(self, year_dec, fileload):
+    def __init__(self, year_dec, fileload, reversetime = -1):
         super().__init__(year_dec)
         #load the HDF5 file
         v_print("Loading E, B field perturbations from", fileload)
@@ -202,11 +202,22 @@ class Geofield(Dipolefield):
         self.field_BE[4, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ey" )
         self.field_BE[5, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ez" )
 
+        if reversetime > 0:
+            #modify calls to int_field so that time becomes reversetime - ti:
+            self.reversetime = reversetime
+            self.tmult = -1
+        else:
+            self.reversetime = 0
+            self.tmult = 1
+
         v_print("","done\n")
 
         self.range_adequate = True
 
     def int_field(self, xi, yi, zi, ti):
+        ti = self.reversetime + self.tmult * ti
+        # if reversed, time evolution goes backwards from self.reversetime
+
         #global R_e dg dx dy dz xmint ymint zmint
         dx = self.field_dx
         dy = self.field_dy
@@ -683,14 +694,18 @@ class HDF5_pt:
     #     print(f.tree)
 
 
-#
-#   rotation of a Cartesian position around z axis
-#
 def coord_car_rz(x, y, z, dphi):
-     return (cos(dphi) * x - sin(dphi) * y,
-        sin(dphi) * x + cos(dphi) * y,
-        z)
+    """
+    rotation of a Cartesian position around z axis ANTI-CLOCKWISE
+    rotate vector x, y, z by dphi
+    """
+    return (cos(dphi) * x - sin(dphi) * y, sin(dphi) * x + cos(dphi) * y, z)
 
+def coord_car_get_anticlockwise_angle(x1):
+    """
+    get anticlockwise angle of x1 around z axis from [1, 0]
+    """
+    return (np.angle(x1[0] + x1[1] * 1j, deg=True) + 360) % 360
 
 class Proton_trace:
     def __init__(self, mu, alpha, L, iphase_gyro=0, iphase_bounce=0, iphase_drift=0, storetrack = True):
@@ -712,8 +727,8 @@ class Proton_trace:
         self.gc_times = []
         self.gc_pos = []
 
-        self.muenKalphaL = np.array([[mu, -1., -1., alpha, L],
-            [-1.,-1.,-1.,-1.,-1.]])
+        self.muenKalphaL = np.array([[mu, -1, -1, alpha, L, -1, -1, -1],
+                                     [-1, -1, -1, -1, -1, -1, -1, -1]])
 
         self.storetrack = storetrack
         if storetrack:
@@ -759,42 +774,42 @@ class Proton_trace:
         self.times[-1] = time
         self.pt[-1] = state
 
-    def cap_to_bounce(self, z_equator = 0, shift0 = 0):
-        """
-        this function finds the index after the last full bounce, using recursion
-        """
-        
-        #positions = self.getpt()[:,:3]
-        zco = self.getpt()[shift0:,2]
-        shift1 = 0
-
-        #our process for integrating right up until z = 0 to get a full bounce may have caused a z < 0
-        while zco[shift1] < z_equator:
-            shift1 += 1
-            if shift1 == np.size(zco):
-                #v_print("Error: no bounce detected at all")
-                return shift0
-        #find out the index of the first z < 0:
-        idx_bounce_half = shift1 + ((zco[shift1:] < z_equator).argmax(axis=0))
-
-
-        if idx_bounce_half <= shift1:
-            #the first (shifted) position is definitely not below zero, therefore...
-            # we didn't even get half a bounce
-            #v_print("Error: didn't half bounce after", self.bounces, "bounces")
-            return shift0
-        
-        idx_bounce_nexthalf = ((zco[idx_bounce_half:] > z_equator).argmax(axis=0))
-
-        if idx_bounce_nexthalf == 0:
-            #the first position is definitely not above zero, therefore...
-            # we didn't get another half bounce
-            #v_print("Error: didn't half bounce after", self.bounces, "bounces")
-            return shift0
-        
-        shift1 = idx_bounce_half + idx_bounce_nexthalf + 1
-        
-        return self.cap_to_bounce(z_equator=z_equator, shift0 = shift0 + shift1)
+    # def cap_to_bounce(self, z_equator = 0, shift0 = 0):
+    #     """
+    #     this function finds the index after the last full bounce, using recursion
+    #     """
+    #
+    #     #positions = self.getpt()[:,:3]
+    #     zco = self.getpt()[shift0:,2]
+    #     shift1 = 0
+    #
+    #     #our process for integrating right up until z = 0 to get a full bounce may have caused a z < 0
+    #     while zco[shift1] < z_equator:
+    #         shift1 += 1
+    #         if shift1 == np.size(zco):
+    #             #v_print("Error: no bounce detected at all")
+    #             return shift0
+    #     #find out the index of the first z < 0:
+    #     idx_bounce_half = shift1 + ((zco[shift1:] < z_equator).argmax(axis=0))
+    #
+    #
+    #     if idx_bounce_half <= shift1:
+    #         #the first (shifted) position is definitely not below zero, therefore...
+    #         # we didn't even get half a bounce
+    #         #v_print("Error: didn't half bounce after", self.bounces, "bounces")
+    #         return shift0
+    #
+    #     idx_bounce_nexthalf = ((zco[idx_bounce_half:] > z_equator).argmax(axis=0))
+    #
+    #     if idx_bounce_nexthalf == 0:
+    #         #the first position is definitely not above zero, therefore...
+    #         # we didn't get another half bounce
+    #         #v_print("Error: didn't half bounce after", self.bounces, "bounces")
+    #         return shift0
+    #
+    #     shift1 = idx_bounce_half + idx_bounce_nexthalf + 1
+    #
+    #     return self.cap_to_bounce(z_equator=z_equator, shift0 = shift0 + shift1)
 
 
     def pop_track(self, requiredlen = 0):
@@ -809,7 +824,7 @@ class Proton_trace:
         #get initial position of the GC based on particle L:
         R_gc_RE = self.init_L
         R_gc = R_gc_RE * constants.RE
-        
+
         xgc, ygc, zgc = coord_car_rz(R_gc, 0, 0, np.radians(self.iphase_drift))
 
         x0_GC = np.array([xgc, ygc, zgc])
@@ -1006,6 +1021,7 @@ class config_rw:
         self.findK0_kw = "find initial K"
         self.reeval_kw = "re-calculate invariants"
         self.duration_kw = "duration to solve"
+        self.reverse_kw = "reverse"
         self.year_kw = "year"
         self.month_kw = "month"
         self.day_kw = "day"
@@ -1038,6 +1054,7 @@ class config_rw:
             
             self.datadic[self.duration_kw] = float(self.datadic[self.duration_kw][0])
 
+            self.datadic[self.reverse_kw] = str(self.datadic[self.reverse_kw][0])
             self.datadic[self.storetrack_kw] = str(self.datadic[self.storetrack_kw][0])
             self.datadic[self.storegc_kw] = str(self.datadic[self.storegc_kw][0])
             self.datadic[self.findK0_kw] = str(self.datadic[self.findK0_kw][0])
