@@ -1,5 +1,4 @@
 import os.path
-
 import pt_tools
 import sys
 from math import pi, sqrt
@@ -15,6 +14,7 @@ import datetime
 import argparse
 import matplotlib
 mu_conv = pt_tools.constants.G2T/pt_tools.constants.MeV2J
+
 
 def colors(n, truerandom = False):
     """
@@ -159,7 +159,15 @@ def plot_positions(positionslist, seeEarth=True, filename=None, limit=-1, view_e
     plt.close()
 
 
-def plot_positions2D_birdseye(positionslist, seeEarth=True, filename=None, ring = -1, axlims = []):
+def plot_positions2D_birdseye(resultfile, ptids, tracklist, seeEarth=True, filename=None, ring = -1, axlims = [], maxn=-1, skipeveryn = 5):
+    if maxn > 0:
+        nplot = min(len(ptids), maxn)
+    elif maxn == 0:
+        print("","warning, maxn set to zero, not plotting any trajectories...")
+        return
+    else:
+        nplot = len(ptids)
+
     # set up figure and axes:
     fig, ax1 = plt.subplots()
 
@@ -171,21 +179,66 @@ def plot_positions2D_birdseye(positionslist, seeEarth=True, filename=None, ring 
         ax1.add_patch(circle2)
 
 
-    colours = colors(len(positionslist))
 
-    # draw particle trajectory:
-    colours = colors(len(positionslist))
-    for idx, positions in enumerate(positionslist):
-        #if idx==1:continue
+    colours = colors(nplot)
+
+    nplotted = 0
+    for idx, ptid in enumerate(ptids):
+        if nplotted == nplot:
+            break
+        checkcode = ptids[ptid]
+
+        # mu = tracklist[ptid][0]
+        # aeq = tracklist[ptid][1]
+        # L = tracklist[ptid][2]
+        # pg, pb, pd = tracklist[ptid][3:]
+
+        if checkcode == 0: continue
+
+        time, positions = resultfile.read_track(ptid, verbose = False, skipeveryn = skipeveryn)
+
+        # muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
+        # #print(muenKalphaL1)
+        # final_logmu = np.log10(muenKalphaL1[0] * mu_conv)
+        # final_aeq = muenKalphaL1[3]
+        # final_L = muenKalphaL1[4]
+        # final_iphase_g = muenKalphaL1[5]
+        # final_iphase_b = muenKalphaL1[6]
+        # final_iphase_d = muenKalphaL1[7]
+        # #print(final_logmu, final_aeq*180/np.pi, final_L, final_iphase_g, final_iphase_b, final_iphase_d)
+        # #print(muenKalphaL0[0]* mu_conv, muenKalphaL0[1:], muenKalphaL0[3]*180/pi)
+
+        # pre_pds.append(pd)
+        # pre_Ls.append(muenKalphaL0[4])
+        # pre_ens.append(muenKalphaL0[1])
+        # if checkcode == 1:
+        #     #print(muenKalphaL1[0]* mu_conv, muenKalphaL1[1:], muenKalphaL1[3]*180/pi)
+        #     post_Ls.append(muenKalphaL1[4])
+        #     post_ens.append(muenKalphaL1[1])
+        #     post_aeqs.append(muenKalphaL1[3])
+        #     post_Ks.append(muenKalphaL1[2])
+        # else:
+        #     print("","post-tracking invariants could not be evaluated")
+        #     post_Ls.append(-1)
+        #     post_ens.append(-1)
+        #     post_aeqs.append(-1)
+        #     post_Ks.append(-1)
+
+
+        #draw particle trajectory:
         positions = positions / pt_tools.constants.RE
         #ax1.scatter(positions[:, 0], positions[:, 1], color=colours[idx], marker = ".", zorder=1, s=0.1)
-        ax1.plot(positions[:, 0], positions[:, 1], color=colours[idx], zorder=1, lw=0.25)
+        ax1.plot(positions[:, 0], positions[:, 1], color=colours[idx], zorder=1, lw=0.1)
         ax1.scatter([positions[0, 0], positions[-1, 0]], [positions[0, 1], positions[-1, 1]], c=['black', 'red'], marker=".", zorder=2, s=1)
+
+        nplotted += 1
 
     # axis labels:
     plt.xlabel('$X_{\mathrm{MAG}}$ [$R_{\mathrm{E}}$]')
     plt.ylabel('$Y_{\mathrm{MAG}}$ [$R_{\mathrm{E}}$]')
     ax1.axis('equal')
+    ax1.text(0.01, 0.06, "initial", color='black', transform=ax1.transAxes, ha='left', va='bottom')
+    ax1.text(0.01, 0.01, "final", color='red', transform=ax1.transAxes, ha='left', va='bottom')
 
     if len(axlims):
         ax1.set_xlim(axlims[0])
@@ -238,81 +291,55 @@ def plot_positions2D_side(positionslist, seeEarth=True, filename=None, ring = -1
     return [ax1.get_xlim(), ax1.get_ylim()]
 
 
-
-
-
-#set up parser and arguments: ------------------------------------------------+
-parser = argparse.ArgumentParser(description='Get configuration file')
-
-parser.add_argument("--solution",type=str, required=True)
-
-args = parser.parse_args()
-
-fileh5 = args.solution
-#-----------------------------------------------------------------------------+
-
-
-
-
-
-poslist = []
-invariants = []
-skipeveryn_additionally =1
-
-
-
-pre_pds = []
-pre_Ls = []
-post_Ls = []
-pre_ens = []
-post_ens = []
-post_aeqs = []
-post_Ks = []
-
-
-resultfile = pt_tools.HDF5_pt(fileh5, existing=True)
-metadata = resultfile.read_root()
-ptids = resultfile.get_solved_ids()
-tracklist = resultfile.get_existing_tracklist()
-
-#
-#resultfile.print_file_tree()
-#
-
-def plot_invariants(axes_invariants_idx = [4, 0, 2], filename=None, axlims = []):
+def plot_invariants(resultfile, ptids, tracklist, axes_invariants_idx = [4, 0, 7], filename=None, axlims = [], maxn = -1):
     axes_invariants_labels = ['$\mu$ [MeV/G]',
                               'E [MeV]',
                               '$K$ [G$^{0.5}$R$_E$]',
                               '$\\alpha_{\\mathrm{eq}}$ [$^{\circ}$]',
-                              '$L$']
+                              '$L$',
+                              '$\\phi_1$',
+                              '$\\phi_2$',
+                              '$\\phi_3$']
     axes_invariants_logspace = [True,
                                 True,
                                 False,
                                 False,
+                                False,
+                                False,
+                                False,
                                 False]
-
+    if maxn > 0:
+        nplot = min(len(ptids), maxn)
+    elif maxn == 0:
+        print("","warning, maxn set to zero, not plotting any trajectories...")
+        return
+    else:
+        nplot = len(ptids)
 
     fig, ax = plt.subplots()
     colormap = plt.cm.jet  # or any other colormap
 
     xyc0 = []
     xyc1 = []
-    # xyc0_lost = []
+    nplotted = 0
     for ptid in ptids:
+        if nplotted == nplot:
+            break
         checkcode = ptids[ptid]
         if checkcode != 1:
             # checkcode > 1 could be caused by a number of issues, see return statements in solve_trajectory(...)
             print("pt ID {} has incorrect check code".format(ptid))
             continue
 
-        #pg, pb, pd = tracklist[ptid][3:] #starting phases
 
-        time, pos = resultfile.read_track(ptid)
+        #time, pos = resultfile.read_track(ptid, verbose = False)
         muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
         muenKalphaL0[0] = muenKalphaL0[0] * mu_conv
         muenKalphaL1[0] = muenKalphaL1[0] * mu_conv
         muenKalphaL0[3] = muenKalphaL0[3] * 180/np.pi
         muenKalphaL1[3] = muenKalphaL1[3] * 180/np.pi
+        pg, pb, pd = tracklist[ptid][3:] #starting phases, for solutions produced before these were added to muenKalphaL0
+        muenKalphaL0[5:8] = pg, pb, pd
 
         if muenKalphaL1[2] < 0 and muenKalphaL1[0] > 0:
             # K = -1 but mu, etc., is valid when bounce orbits could not correctly be ID'd
@@ -332,8 +359,7 @@ def plot_invariants(axes_invariants_idx = [4, 0, 2], filename=None, axlims = [])
                 muenKalphaL1[axes_invariants_idx[0]],
                 muenKalphaL1[axes_invariants_idx[1]],
                 muenKalphaL1[axes_invariants_idx[2]]])
-
-        print(muenKalphaL1)
+        nplotted += 1
 
     xyc0 = np.array(xyc0)
     xyc1 = np.array(xyc1)
@@ -376,6 +402,7 @@ def plot_invariants(axes_invariants_idx = [4, 0, 2], filename=None, axlims = [])
         ax.set_xlim(axlims[0])
         ax.set_ylim(axlims[1])
 
+    plt.tight_layout()
     if filename:
         plt.savefig(filename, dpi=300, facecolor='w', edgecolor='w', orientation='portrait')
     else:
@@ -387,64 +414,63 @@ def plot_invariants(axes_invariants_idx = [4, 0, 2], filename=None, axlims = [])
 
 
 
-for ptid in ptids:
-    mu = tracklist[ptid][0]
-    aeq = tracklist[ptid][1]
-    L = tracklist[ptid][2]
-    pg, pb, pd = tracklist[ptid][3:]
-    checkcode = ptids[ptid]
 
-    if checkcode == 0: continue
-    time, pos = resultfile.read_track(ptid)
-    muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
-    #print(muenKalphaL1)
-    final_logmu = np.log10(muenKalphaL1[0] * mu_conv)
-    final_aeq = muenKalphaL1[3]
-    final_L = muenKalphaL1[4]
-    final_iphase_g = muenKalphaL1[5]
-    final_iphase_b = muenKalphaL1[6]
-    final_iphase_d = muenKalphaL1[7]
-    print(final_logmu, final_aeq*180/np.pi, final_L, final_iphase_g, final_iphase_b, final_iphase_d)
-    #print(muenKalphaL0[0]* mu_conv, muenKalphaL0[1:], muenKalphaL0[3]*180/pi)
+#set up parser and arguments: ------------------------------------------------+
+parser = argparse.ArgumentParser(description='Get configuration file')
 
-    pre_pds.append(pd)
-    pre_Ls.append(muenKalphaL0[4])
-    pre_ens.append(muenKalphaL0[1])
-    if checkcode == 1:
-        #print(muenKalphaL1[0]* mu_conv, muenKalphaL1[1:], muenKalphaL1[3]*180/pi)
-        post_Ls.append(muenKalphaL1[4])
-        post_ens.append(muenKalphaL1[1])
-        post_aeqs.append(muenKalphaL1[3])
-        post_Ks.append(muenKalphaL1[2])
-    else:
-        print("","post-tracking invariants could not be evaluated")
-        post_Ls.append(-1)
-        post_ens.append(-1)
-        post_aeqs.append(-1)
-        post_Ks.append(-1)
-    print()
-    if len(time) < 2: skipeveryn_additionally = 1
-    time_ = time[::skipeveryn_additionally]
-    pos_ = pos[::skipeveryn_additionally]
-    poslist.append(pos_)
+parser.add_argument("--solution",type=str, required=True)
+
+args = parser.parse_args()
+
+fileh5 = args.solution
+#-----------------------------------------------------------------------------+
+
+
+resultfile = pt_tools.HDF5_pt(fileh5, existing=True)
+metadata = resultfile.read_root()
+ptids = resultfile.get_solved_ids()
+tracklist = resultfile.get_existing_tracklist()
+
+
+#
+#resultfile.print_file_tree()
+#
+
+
+
+#print("plotting {} particles...".format(len(ptids)))
+
+
 
 plotname = os.path.basename(fileh5[:-3])
+maxn = -1
 
-axlims = plot_invariants(filename="Figure_adiabatics.png",
-                         axlims = [])
+print("Plotting changes to invariants...")
+axlims = plot_invariants(resultfile, ptids, tracklist, filename="Figure_adiabatics_{}.png".format(plotname),
+    maxn=maxn,
+    axlims = [],
+    )#axes_invariants_idx = [7,4,1])
+#flc:
+#axlims = plot_invariants(filename="Figure_adiabatics_{}.png".format(plotname), maxn=maxn,
+#    axlims = [], axes_invariants_idx = [1, 2, 3])
+
 print(axlims)
-#print()
-#print("Printing 3D overview, click and drag to move around...")
-#plot_positions(poslist, seeEarth = False, view_ele = 0, view_azi = -71)
 print()
+
+#print("Printing 3D overview, click and drag to move around...")
+#plot_positions(seeEarth = False, view_ele = 0, view_azi = -71)
+#print()
+
 print("Printing 2D overview looking down towards Earth...")
-axlims = plot_positions2D_birdseye(poslist, seeEarth = False, ring = -1, filename="Figure_birdseye_{}.png".format(plotname),
-                                   axlims=[])
+axlims = plot_positions2D_birdseye(resultfile, ptids, tracklist, seeEarth = False, ring = -1, filename="Figure_birdseye_{}.png".format(plotname),
+    maxn=maxn,
+    axlims=[],
+    skipeveryn=25)
 print(axlims)
+print()
 
-print("Printing 2D overview side-on...")
-axlims = plot_positions2D_side(poslist, seeEarth = False, ring = -1, filename="Figure_side_{}.png".format(plotname),
-                               axlims=[])
-print(axlims)
-
-
+#print("Printing 2D overview side-on...")
+#axlims = plot_positions2D_side(seeEarth = False, ring = -1, filename="Figure_side_{}.png".format(plotname),
+#    axlims=[])
+#print(axlims)
+#print()

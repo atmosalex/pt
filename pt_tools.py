@@ -597,20 +597,20 @@ class HDF5_pt:
             fo.close()
             return q
 
-    def read_track(self, id):
+    def read_track(self, id, verbose=True, skipeveryn = 1):
         fo = h5py.File(self.filepath, 'r', swmr=True)
         checklist = fo['tracklist_check']
         checkcode = checklist[id][()]
 
-        print("Reading track of particle ID", id)
+        if verbose: print("Reading track of particle ID", id)
         if checkcode != 1:
-            print(" warning: checkcode is ",checkcode)
+            if verbose: print(" warning: checkcode is ",checkcode)
 
             #fo.close()
             #return np.array([]), np.array([])
         
-        times = fo.get(self.group_name_tracks + "/" + str(id) + '/time')[()]
-        pos = fo.get(self.group_name_tracks + "/" + str(id) + '/position')[()]
+        times = fo.get(self.group_name_tracks + "/" + str(id) + '/time')[::skipeveryn][()]
+        pos = fo.get(self.group_name_tracks + "/" + str(id) + '/position')[::skipeveryn][()]
 
         fo.close()
         return times, pos
@@ -727,7 +727,7 @@ class Proton_trace:
         self.gc_times = []
         self.gc_pos = []
 
-        self.muenKalphaL = np.array([[mu, -1, -1, alpha, L, -1, -1, -1],
+        self.muenKalphaL = np.array([[mu, -1, -1, alpha, L, iphase_gyro, iphase_bounce, iphase_drift],
                                      [-1, -1, -1, -1, -1, -1, -1, -1]])
 
         self.storetrack = storetrack

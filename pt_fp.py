@@ -356,8 +356,6 @@ def get_bouncecapped_trajectory(tocap_time, tocap_pt, idx_newbounce_start = 0, r
 #     return 1
 
 
-
-
 def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, findK0 = False, storegc = False, reverse=False):
     global pusher
     if (not particle.storetrack) and storegc:
@@ -456,7 +454,7 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
     particle.update(t0_init, [*x0_init, *p0_init])
 
     # if nonmirroring:
-    #     dt_solve_increment = tb_est #tb_estimate(np.linalg.norm(x0_GC), np.linalg.norm(v0), nonmirror_threshold * pi / 180)
+    dt_solve_increment = tb_est #tb_estimate(np.linalg.norm(x0_GC), np.linalg.norm(v0), nonmirror_threshold * pi / 180)
     #     t1 = t0_init
     #     x1 = x0_init
     #     p1 = p0_init
@@ -757,7 +755,6 @@ def derive_invariants(particle, bfield, reverse=False): #called from pt_run
         phase_b = dt_toeq / tb_est
     else:
         phase_b = 1 - dt_toeq / tb_est
-    print("phase_b: {}".format(phase_b)) #delete
 
     print("","particle was followed for an extra {:.5f}s in B, E at t={:.5f}s".format(dt_toeq, t1))
 
