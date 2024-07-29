@@ -1,7 +1,7 @@
 import numpy as np
 #from pyIGRF.loadCoeffs import get_coeffs
 import pyIGRF
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
 import sys
@@ -918,12 +918,8 @@ def approx_Ya(aeq):
 
 def dt_to_dec(dt):
     """Convert a datetime to decimal year. Use like so: dt = datetime(2020, 1, 1); year = dt_to_dec(dt)"""
-    year_start = datetime(dt.year, 1, 1)
+    year_start = datetime(dt.year, 1, 1, tzinfo=timezone.utc)
     year_end = year_start.replace(year=dt.year+1)
-
-    #add any tzinfo from dt:
-    year_start = year_start.replace(tzinfo=dt.tzinfo)
-    year_end = year_end.replace(tzinfo=dt.tzinfo)
 
     return dt.year + ((dt - year_start).total_seconds() /  # seconds so far
         float((year_end - year_start).total_seconds()))  # seconds in year

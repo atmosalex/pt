@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import pt_fp
 from math import log10
-from datetime import datetime
+from datetime import datetime, timezone
 import argparse
 import os
 from pathlib import Path
@@ -51,7 +51,7 @@ reverse = config.datadic[config.reverse_kw]
 year = config.datadic[config.year_kw]
 month = config.datadic[config.month_kw]
 day = config.datadic[config.day_kw]
-dt = datetime(year, month, day)
+dt = datetime(year, month, day, tzinfo=timezone.utc)
 lmin = config.datadic[config.lmin_kw]
 lmax = config.datadic[config.lmax_kw]
 nl = config.datadic[config.nl_kw]
