@@ -431,6 +431,22 @@ metadata = resultfile.read_root()
 ptids = resultfile.get_solved_ids()
 tracklist = resultfile.get_existing_tracklist()
 
+# fo_name = "invariant_list_{}.txt".format(os.path.basename(fileh5)[:-3])
+# with open(fo_name, 'w') as fo:
+#     for ptid in ptids:
+#         checkcode = ptids[ptid]
+#         if checkcode == 1:
+#             muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
+#         else:
+#             muenKalphaL0 = np.ones(8) *-1
+#             muenKalphaL1 = np.ones(8) *-1
+
+#         fo.write("{},{},".format(ptid, checkcode) + ",".join(["{:.5E}".format(x) for x in muenKalphaL0]) + "," + ",".join(["{:.5f}".format(x) for x in muenKalphaL1]) + '\n')
+
+#     sys.exit()
+# print("wrote invariants to {}".format(fo_name))
+# sys.exit()
+
 
 #
 #resultfile.print_file_tree()

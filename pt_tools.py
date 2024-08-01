@@ -404,6 +404,23 @@ class HDF5_pt:
 
         return loadeditems
 
+    def update_dataset(self, qname, quantity, compressmethod=None, quiet=False):
+        if not quiet:
+            v_print("replacing", qname, "in", self.filepath, ", of length", len(quantity))
+
+        fo = h5py.File(self.filepath, 'a')
+
+        qexists = qname in fo
+        if not (qexists):
+            print("Error: quantity to update does not exist")
+            fo.close()
+            sys.exit(1)
+        else:
+            # group = fo.get(gname_full)
+            quantity_ow = fo[qname]  # load the data
+            quantity_ow[...] = quantity
+        fo.close()
+
     def add_track(self, id, particle, compressmethod = None, skipeveryn = 1, checkcode = 1, quiet=False):
         """add new data corresponding to a particle ID"""
 
@@ -510,7 +527,7 @@ class HDF5_pt:
             #group = fo.get(gname_full)
             quantity_ow = fo[qname_full]  # load the data
             if np.shape(quantity_ow[()]) != np.shape(quantity):
-                print("Error: overwrite quantity must have the same shape as existing data but does not")
+                print("Error: overwrite quantity must have the same shape as existing data but it does not")
                 sys.exit(1)
             #the data MUST be the same dimensions
             quantity_ow[...] = quantity
@@ -844,9 +861,7 @@ class Proton_trace:
         p0_perp = sqrt(self.init_mu*2*self.m0*np.linalg.norm(B_GC))
         p0_par = 1./tan(self.init_alpha) * p0_perp
         p0mag = sqrt(p0_perp**2 + p0_par**2)
-
         ga = sqrt(1 + (p0mag/(self.m0 * constants.c))**2)
-
         massr = ga*self.m0
 
         #derive velocity:
@@ -894,6 +909,7 @@ class Proton_trace:
         gamma = sqrt(1 + (p0mag/(self.m0 * constants.c))**2)
         E0_J = (gamma - 1)*self.m0*(constants.c**2) #J
         #E0 = E0_J / constants.MeV2J #KE energy in MeV
+
         return E0_J
 
 class Electron_trace(Proton_trace):
@@ -1037,10 +1053,11 @@ class config_rw:
         self.skipeveryn_kw = "skipeveryn"
         self.emin_kw = "emin"
         self.emax_kw = "emax"
-        self.continuefrom_kw = "continuefrom"
         self.iphase_gyro_kw = "iphase_gyro"
         self.iphase_bounce_kw = "iphase_bounce"
         self.iphase_drift_kw = "iphase_drift"
+        self.continuefrom_kw = "continuefrom"
+        self.override_energy_axis_kw = "override energy axis"
 
 
     def convert_types(self):
@@ -1088,6 +1105,10 @@ class config_rw:
             self.datadic[self.iphase_drift_kw] = float(self.datadic[self.iphase_drift_kw][0])
 
             self.datadic[self.continuefrom_kw] = str(self.datadic[self.continuefrom_kw][0])
+            if str(self.datadic[self.override_energy_axis_kw][0]):
+                self.datadic[self.override_energy_axis_kw] = np.array([float(x) for x in self.datadic[self.override_energy_axis_kw]])
+            else:
+                self.datadic[self.override_energy_axis_kw] = np.array([])
             return 1
         except Exception as e:
             print(e)

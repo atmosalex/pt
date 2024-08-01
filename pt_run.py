@@ -72,6 +72,7 @@ iphase_gyro = config.datadic[config.iphase_gyro_kw]
 iphase_bounce = config.datadic[config.iphase_bounce_kw]
 iphase_drift = config.datadic[config.iphase_drift_kw]
 continuefrom = config.datadic[config.continuefrom_kw]
+override_energy_axis = config.datadic[config.override_energy_axis_kw]
 
 # process configuration file options:
 if particletype[0].lower() == "p":
@@ -124,11 +125,15 @@ if nphase_drift < 1: nphase_drift = 1
 #
 #   Generate a grid of invariant coordinates:
 #
+if override_energy_axis.size:
+    nmu = override_energy_axis.size
+    logmumin = np.nan
+    logmumax = np.nan
+mur = np.linspace(logmumin, logmumax, nmu)
+mur = np.power(10 * np.ones(mur.shape), mur)
+mur = mur[::-1]  # reverse to start at higher energy and work down
 lr = np.linspace(lmin, lmax, nl)
 ar = np.linspace(amin, amax, na)
-mur = np.linspace(logmumin, logmumax, nmu)
-mur = np.power(10*np.ones(mur.shape),mur)
-mur = mur[::-1] #reverse to start at higher energy and work down
 #phases to initialise between 0 and 1:
 phase_gyro = (np.linspace(0, 1, nphase_gyro + 1)[:nphase_gyro] + iphase_gyro) % 1
 phase_bounce = (np.linspace(0, 1, nphase_bounce + 1)[:nphase_bounce] + iphase_bounce) % 1
@@ -161,9 +166,6 @@ if len(continuefrom):
         print("Error: the solutions file does not exist at", filename_hdf5)
         sys.exit(1)
     resultfile = pt_tools.HDF5_pt(filename_hdf5, existing = True)
-    #resultfile.setup(config.datadic, tracklist) will not work now
-    #tracklist = resultfile.get_existing_tracklist()
-    # running .get_existing_tracklist() also sets .tracklist_ID
 else:
     print("Starting new pt solution:")
     #launch = input("Ready to launch? (press enter)")
@@ -193,6 +195,7 @@ else:
                             tracklist[count] = [mu, pa, L, pg, pb, pd]
                             count+=1
 
+
     #write the basic structure and metadata of the HDF5 results file:
     resultfile = pt_tools.HDF5_pt(filename_hdf5)
     resultfile.setup(config.datadic, tracklist)
@@ -209,7 +212,9 @@ else:
 metadata = resultfile.read_root()
 tracklist_ID = metadata['tracklist_ID']
 checkcodes = resultfile.get_solved_ids()
-
+if override_energy_axis.size:
+    tracklist_mu_changes = metadata['tracklist_mu'] #recalculated as we iterate through the particles below
+    tracklist_energy = dict(zip(np.arange(tracklist_ID.size), np.repeat(override_energy_axis, ar.size * lr.size * phase_gyro.size * phase_bounce.size * phase_drift.size)))
 
 #
 #   Instantiate magnetic field
@@ -243,7 +248,7 @@ for pt_id in tracklist_ID:
     id = metadata['tracklist_ID'][pt_id]
     
     mu = metadata['tracklist_mu'][pt_id]
-    mu = mu * MeV2J / G2T #change units of mu to SI
+    mu_SI = mu * MeV2J / G2T #change units of mu to SI
     pa = metadata['tracklist_pa'][pt_id]
     pa = pa * pi / 180 #change units of pi to radian
     if pa > pt_fp.aeq_max_for_bounce_detection * pi / 180:
@@ -254,7 +259,28 @@ for pt_id in tracklist_ID:
     phase_b = metadata['tracklist_pb'][pt_id]
     phase_d = metadata['tracklist_pd'][pt_id]
 
-    particle = Particle(mu, pa, L, phase_g, phase_b, phase_d, storetrack = storetrack)
+    particle = Particle(mu_SI, pa, L, phase_g, phase_b, phase_d, storetrack=storetrack)
+
+    if mu != mu:  # NaN value for when we are overriding the mu axis with some specific energy
+        #use energy to calculate mu:
+        # get initial position of the GC based on particle L:
+        x0_GC = particle.calculate_initial_GC()
+        # get a possible initial momentum vector on the magnetic equator,
+        #   multiple solutions because adiabatic invariants say nothing about phase:
+        B_GC = np.linalg.norm(bfield.getBE(*x0_GC, 0)[:3])
+        E0_J = tracklist_energy[pt_id] * pt_tools.constants.MeV2J
+        gamma = 1 + E0_J/ (particle.m0 * (pt_tools.constants.c ** 2))
+        p0mag = (particle.m0 * pt_tools.constants.c) * np.sqrt(gamma**2 - 1)
+        p0_perp = p0mag * np.sin(pa)
+        mu_SI = (p0_perp**2)/(2 * B_GC * particle.m0)
+        mu = mu_SI * pt_tools.constants.G2T / pt_tools.constants.MeV2J
+
+        #reinstantiate the particle:
+        particle = Particle(mu_SI, pa, L, phase_g, phase_b, phase_d, storetrack=storetrack)
+
+        #update tracklist and H5 file with mu:
+        tracklist_mu_changes[pt_id] = mu
+        resultfile.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
 
     #
     #   Check the energy and pitch angle:

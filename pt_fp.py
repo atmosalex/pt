@@ -384,6 +384,7 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
     #get a possible initial momentum vector on the magnetic equator,
     #   multiple solutions because adiabatic invariants say nothing about phase:
     B_GC = bfield.getBE(*x0_GC, t0)[:3]
+
     p0 = particle.calculate_initial_momentum(B_GC)
 
     #initial state vector of the GC:
