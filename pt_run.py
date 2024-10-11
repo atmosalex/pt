@@ -221,9 +221,9 @@ if override_energy_axis.size:
 #
 if len(fieldpath): #include non-dipolar field perturbations and time variation from the file
     if reverse:
-        bfield = pt_tools.Geofield(year_dec, fieldpath, reversetime = duration_solve)
+        bfield = pt_tools.Geofield(fieldpath, reversetime = duration_solve)
     else:
-        bfield = pt_tools.Geofield(year_dec, fieldpath)
+        bfield = pt_tools.Geofield(fieldpath)
     if duration_solve > bfield.field_time[-1]:
         print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
         sys.exit(1)

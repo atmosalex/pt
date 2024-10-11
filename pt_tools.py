@@ -162,12 +162,17 @@ class Dipolefield:
         return constants.RE * np.array([eta, zeta, xi])
 
 class Geofield(Dipolefield):
-    def __init__(self, year_dec, fileload, reversetime = -1):
-        super().__init__(year_dec)
+    def __init__(self, fileload, reversetime = -1):
         #load the HDF5 file
         v_print("Loading E, B field perturbations from", fileload)
 
         disk = field_h5.HDF5_field(fileload, existing = True)
+
+        t0_ts = disk.read_dataset(disk.group_name_data, "t0")
+        t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
+        year_dec = dt_to_dec(t0)
+        super().__init__(year_dec)
+        self.t0 = t0
 
         self.field_time = disk.read_dataset(disk.group_name_data, "time")
         self.field_dt = self.field_time[1] - self.field_time[0]
@@ -642,10 +647,14 @@ class HDF5_pt:
         #     fo.close()
         #     return np.array([]), np.array([])
         # else:
-        muenKalphaL0 = fo.get(self.group_name_tracks + "/" + str(id) + '/' + self.dataset_name_muenKalphaL0)[()]
-        muenKalphaL1 = fo.get(self.group_name_tracks + "/" + str(id) + '/' + self.dataset_name_muenKalphaL1)[()]
-
+        muenKalphaL0 = fo.get(self.group_name_tracks + "/" + str(id) + '/' + self.dataset_name_muenKalphaL0)
+        if not muenKalphaL0 is None:
+            muenKalphaL0 = muenKalphaL0[()]
+        muenKalphaL1 = fo.get(self.group_name_tracks + "/" + str(id) + '/' + self.dataset_name_muenKalphaL1)
+        if not muenKalphaL1 is None:
+            muenKalphaL1 = muenKalphaL1[()]
         fo.close()
+        
         return muenKalphaL0, muenKalphaL1
 
     def get_existing_tracklist(self):

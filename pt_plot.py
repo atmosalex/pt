@@ -437,13 +437,14 @@ tracklist = resultfile.get_existing_tracklist()
 #         checkcode = ptids[ptid]
 #         if checkcode == 1:
 #             muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
+#             if muenKalphaL0 is None or muenKalphaL1 is None:
+#                 muenKalphaL0 = np.ones(8) *-1
+#                 muenKalphaL1 = np.ones(8) *-1
 #         else:
 #             muenKalphaL0 = np.ones(8) *-1
 #             muenKalphaL1 = np.ones(8) *-1
 
-#         fo.write("{},{},".format(ptid, checkcode) + ",".join(["{:.5E}".format(x) for x in muenKalphaL0]) + "," + ",".join(["{:.5f}".format(x) for x in muenKalphaL1]) + '\n')
-
-#     sys.exit()
+#         fo.write("{},{},".format(ptid, checkcode) + ",".join(["{:.5E}".format(x) for x in muenKalphaL0]) + "," + ",".join(["{:.5E}".format(x) for x in muenKalphaL1]) + '\n')
 # print("wrote invariants to {}".format(fo_name))
 # sys.exit()
 
@@ -470,7 +471,7 @@ axlims = plot_invariants(resultfile, ptids, tracklist, filename="Figure_adiabati
 #axlims = plot_invariants(filename="Figure_adiabatics_{}.png".format(plotname), maxn=maxn,
 #    axlims = [], axes_invariants_idx = [1, 2, 3])
 
-print(axlims)
+#print(axlims)
 print()
 
 #print("Printing 3D overview, click and drag to move around...")

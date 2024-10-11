@@ -18,7 +18,7 @@ from math import cos, sin, sqrt, atan2, tan
 
 
 class Epulse: #method of Li et al, 1993
-    def __init__(self, E0=240e-3, c1=0.8, c2=0.8, c3=8., v0=2.e6, ti=80, phi0=pi/8, d=30.e6):
+    def __init__(self, E0=240e-3, c1=0.8, c2=0.8, c3=8., v0=2.e6, ti=80, phi0=pi/4, d=30.e6):
         self.E0 = E0 #V/m
         self.c1 = c1
         self.c2 = c2
@@ -30,6 +30,9 @@ class Epulse: #method of Li et al, 1993
         self.td = 2 * 1.03 * constants.RE / v0 #reflection occurs at 1.03RE
 
     def Ephi_dEphidr(self, t, r, phi): #r in m
+        #r and phi must be in the GSE frame
+        # phi increases eastward
+
         #calculate Ephi and dEphidr:
         tph = self.ti + (self.c3*constants.RE/self.v0) * (1 - cos(phi - self.phi0))
         xi2 = ((r + self.v0 * (t - tph)) / self.d)**2
@@ -54,14 +57,14 @@ class Epulse: #method of Li et al, 1993
 # COORDINATE TRANSFORMATIONS/ PROJECTIONS
 #
 #
-def coord_car2sph_np(xyz): #fast cartesian to spherical, from https://stackoverflow.com/questions/4116658/faster-numpy-cartesian-to-spherical-coordinate-conversion
-    ptsnew = np.hstack((xyz, np.zeros(xyz.shape)))
-    xy = xyz[:,0]**2 + xyz[:,1]**2
-    ptsnew[:,3] = np.sqrt(xy + xyz[:,2]**2)
-    ptsnew[:,4] = np.arctan2(np.sqrt(xy), xyz[:,2]) # for elevation angle defined from Z-axis down
-    #ptsnew[:,4] = np.arctan2(xyz[:,2], np.sqrt(xy)) # for elevation angle defined from XY-plane up
-    ptsnew[:,5] = np.arctan2(xyz[:,1], xyz[:,0])
-    return ptsnew
+# def coord_car2sph_np(xyz): #fast cartesian to spherical, from https://stackoverflow.com/questions/4116658/faster-numpy-cartesian-to-spherical-coordinate-conversion
+#     ptsnew = np.hstack((xyz, np.zeros(xyz.shape)))
+#     xy = xyz[:,0]**2 + xyz[:,1]**2
+#     ptsnew[:,3] = np.sqrt(xy + xyz[:,2]**2)
+#     ptsnew[:,4] = np.arctan2(np.sqrt(xy), xyz[:,2]) # for elevation angle defined from Z-axis down
+#     #ptsnew[:,4] = np.arctan2(xyz[:,2], np.sqrt(xy)) # for elevation angle defined from XY-plane up
+#     ptsnew[:,5] = np.arctan2(xyz[:,1], xyz[:,0])
+#     return ptsnew
 def coord_car2sph(x,y,z): #cartesian to spherical
     xy = x**2 + y**2
     r = sqrt(xy + z**2)
@@ -126,13 +129,23 @@ def nearestidx_sph(field_r, field_theta, field_phi, r0, theta0, phi0):
     ki = min(range(len(field_phi)), key=lambda x: abs(field_phi[x]-phi0))#np.abs(field_phi - phi0).argmin()
     return ii, ji, ki
 
-def solvefield_pulse(pulse, fpath_sol, dur, resolution):
+def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
+    import IRBEM as ib
+    import datetime
+    
+    #mf_MAG = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=6, alpha=[90])
+    mf_GSE = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=3, alpha=[90])
+    coords = ib.Coords()
+
+    
+    #create a grid in the GSE frame:
     #coordinate resolution:
     nx, ny, nz, nt = resolution
     #coordinate axes:
-    x = np.linspace(-10, 10, nx)
-    y = np.linspace(-10, 10, ny)
-    z = np.linspace(-10, 10, nz)
+    xlim = 8
+    x = np.linspace(-xlim, xlim, nx)
+    y = np.linspace(-xlim, xlim, ny)
+    z = np.linspace(-xlim, xlim, nz)
     time = np.linspace(0, dur, nt)
 
     #coordinate grids:
@@ -160,31 +173,46 @@ def solvefield_pulse(pulse, fpath_sol, dur, resolution):
     print("E0 = ", pulse.E0, "V/m")
     #solution storage on disk:
     file_exists = exists(fpath_sol)
-    disk = field_h5.HDF5_field(fpath_sol, existing = file_exists, delete = file_exists)
+    disk = field_h5.HDF5_field(fpath_sol, existing = file_exists, delete = False)
+    disk.add_dataset(disk.group_name_data, "t0", t0_ts)
 
     #solve time evolution:
     #bfield = pt_tools.dipolefield(pt_tools.constants.RE, 2015)
     for t in range(0, nt):
         tn = time[t]
-        for i in range(nx):
-            x_ = x[i] * constants.RE
-            for j in range(ny):
-                y_ = y[j] * constants.RE
-                for k in range(nz):
-                    z_ = z[k] * constants.RE
+        t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
+        print("", "solving", t_datetime)
 
-                    r_, th, phi = coord_car2sph(x_, y_, z_)
+        #calculate the rotation matrix from GSE to MAG at this time:
+        rot_GSE_to_MAG = coords.transform([t_datetime, t_datetime, t_datetime], [[1,0,0], [0,1,0], [0,0,1]], 'GSE', 'MAG').T
+        
+        for i in range(nx):
+            x_MAG = x[i] * constants.RE
+            for j in range(ny):
+                y_MAG = y[j] * constants.RE
+                for k in range(nz):
+                    z_MAG = z[k] * constants.RE
+
+                    #convert from MAG to GSE:
+                    x_, y_, z_ = coords.transform([t_datetime], [x_MAG, y_MAG, z_MAG], 'MAG', 'GSE')[0]
+
+                    r_, th, phi = coord_car2sph(x_, y_, z_) #GSE frame
                     #print(x[i], y[j], z[k], r_/constants.RE, th*180/pi, phi*180/pi)
 
                     #solve pulse equation for electric field components Ephi
                     Ephi_, dEphidr = pulse.Ephi_dEphidr(tn, r_, phi)
 
-                    #convert e field to cartesian frame:
+                    #convert e field to cartesian frame, GSE:
                     Ex, Ey, Ez = project_sph2car(r_, th, phi, 0, 0, Ephi_) #+ve for r
 
-                    sol_Ex[t][i][j][k] = Ex
-                    sol_Ey[t][i][j][k] = Ey
-                    sol_Ez[t][i][j][k] = Ez
+                    #rotate this vector back into MAG frame:
+                    Ex_MAG, Ey_MAG, Ez_MAG = np.matmul(rot_GSE_to_MAG, np.array([Ex, Ey, Ez]))
+
+                    sol_Ex[t][i][j][k] = Ex_MAG
+                    sol_Ey[t][i][j][k] = Ey_MAG
+                    sol_Ez[t][i][j][k] = Ez_MAG
+
+
 
                     #solving Faraday's law for the magnetic field components Br and Btheta
                     dbwr = -dt*(Ephi_/(r_ * tan(th)))
@@ -193,7 +221,10 @@ def solvefield_pulse(pulse, fpath_sol, dur, resolution):
 
                     #convert field perturbation to cartesian frame:
                     dBwx, dBwy, dBwz = project_sph2car(r_, th, phi, dbwr, dbwt, dbwp)
-                    #dBwx, dBwy, dBwz = [0,0,0]
+
+                    #rotate this vector back into MAG frame:
+                    dBwx_MAG, dBwy_MAG, dBwz_MAG = np.matmul(rot_GSE_to_MAG, np.array([dBwx, dBwy, dBwz]))
+
                     if t == nt -1: continue
                     sol_Bwx[t+1][i][j][k] = sol_Bwx[t][i][j][k] + dBwx
                     sol_Bwy[t+1][i][j][k] = sol_Bwy[t][i][j][k] + dBwy
@@ -219,15 +250,16 @@ def study_march91(fpath_sol, redo = True):
     file_exists = exists(fpath_sol)
 
     # instantiate the pulse:
-    march91pulse = Epulse(240e-3, 0.8, 0.8, 8.0, 2000e3, 80, pi / 8, 30000e3)
+    march91pulse = Epulse(240e-3, 0.8, 0.8, 8.0, 2000e3, 80, np.pi / 4, 30000e3)
+    t0_ts = 669786080.0 # corresponds to beginning of time axis in figure 1, Li et al., 1993
     #Ephimax, *_ = np.abs(march91pulse.Ephi_dEphidr(0, 25 * constants.RE, pi / 8))  # get the maximum amplitude of the pulse
 
 
     if (not file_exists) or redo:
         print("solving field...")
-        resolution = (100, 100, 100, 30)
+        resolution = (100, 100, 100, 50)
         #resolution = (30, 30, 30, 30)
-        solvefield_pulse(march91pulse, fpath_sol, 160, resolution)
+        solvefield_pulse(march91pulse, fpath_sol, t0_ts, 180, resolution)
         print("", "done")
 
 
