@@ -226,9 +226,9 @@ def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
                     dBwx_MAG, dBwy_MAG, dBwz_MAG = np.matmul(rot_GSE_to_MAG, np.array([dBwx, dBwy, dBwz]))
 
                     if t == nt -1: continue
-                    sol_Bwx[t+1][i][j][k] = sol_Bwx[t][i][j][k] + dBwx
-                    sol_Bwy[t+1][i][j][k] = sol_Bwy[t][i][j][k] + dBwy
-                    sol_Bwz[t+1][i][j][k] = sol_Bwz[t][i][j][k] + dBwz
+                    sol_Bwx[t+1][i][j][k] = sol_Bwx[t][i][j][k] + dBwx_MAG
+                    sol_Bwy[t+1][i][j][k] = sol_Bwy[t][i][j][k] + dBwy_MAG
+                    sol_Bwz[t+1][i][j][k] = sol_Bwz[t][i][j][k] + dBwz_MAG
 
     print("storing fields...")
     #store axes:
