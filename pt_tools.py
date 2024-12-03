@@ -1168,8 +1168,9 @@ class config_rw:
             for keyname in towrite:
                 wf.write(str(keyname))
                 wf.write(",")
-                if isinstance(towrite[keyname], list):
-                    wf.write(str(", ".join(["{}".format(x) for x in towrite[keyname]])))
+                if isinstance(towrite[keyname], list) or isinstance(towrite[keyname], np.ndarray):
+                    listastext = str(", ".join(["{}".format(x) for x in towrite[keyname]]))
+                    wf.write(listastext)
                 else:
                     wf.write(str(towrite[keyname]))
                 wf.write("\n")
