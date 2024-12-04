@@ -355,6 +355,25 @@ def get_bouncecapped_trajectory(tocap_time, tocap_pt, idx_newbounce_start = 0, r
 #
 #     return 1
 
+def extract_GC_only(particle, bfield):
+    if (not particle.storetrack):
+        print("Error: cannot calculate the GC trajectory because the particle object has no track stored")
+        print("", "skipping...")
+        return 2
+
+    t0 = 0.
+    tsperorbit = particle.recommended_tsperorbit
+    x0_GC = particle.calculate_initial_GC()
+    B_GC = bfield.getBE(*x0_GC, t0)[:3]
+    p0 = particle.calculate_initial_momentum(B_GC)
+
+    # initial state vector of the GC:
+    Y0_GC = np.hstack((x0_GC, p0))
+
+    # calculate the gyroradius assuming the Lorentz force is constant within a gyroorbit:
+    rg0 = calc_rg(Y0_GC, bfield, particle)  # relativistically correct
+    particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit)
+    return 1
 
 def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, findK0 = False, storegc = False, reverse=False):
     global pusher

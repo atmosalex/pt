@@ -24,13 +24,14 @@ parser = argparse.ArgumentParser(description='Get configuration file')
 
 parser.add_argument("--config",type=str, required=True)
 parser.add_argument("--runname",type=str, required=False)
+parser.add_argument("--extractgc", required=False, action='store_true')
 
 args = parser.parse_args()
 
 configfile = args.config
 runname = args.runname
+extractgc = args.extractgc
 #-----------------------------------------------------------------------------+
-
 
 #
 #   Read a config file:
@@ -121,6 +122,12 @@ if nphase_gyro < 1: nphase_gyro = 1
 if nphase_bounce < 1: nphase_bounce = 1
 if nphase_drift < 1: nphase_drift = 1
 
+if extractgc and storegc == True:
+    print("Error: extractgc flag was set but config indicates that GC is already stored/set to be stored")
+    sys.exit()
+elif extractgc and not len(continuefrom):
+    print("Error: to extract guiding centers from a previously-computed solution, the continuefrom option must be set as the path to that solution")
+    sys.exit()
 
 #
 #   Generate a grid of invariant coordinates:
@@ -166,6 +173,17 @@ if len(continuefrom):
         print("Error: the solutions file does not exist at", filename_hdf5)
         sys.exit(1)
     resultfile = pt_tools.HDF5_pt(filename_hdf5, existing = True)
+
+    if extractgc:
+        filename_hdf5_GC = filename_hdf5.replace(".h5", "_GC.h5")
+        # write the basic structure and metadata of the HDF5 GC file:
+        tracklist_existing = resultfile.get_existing_tracklist()
+        resultfile_GC = pt_tools.HDF5_pt(filename_hdf5_GC)
+        resultfile_GC.setup(config.datadic, tracklist_existing)
+        if skipeveryn > 1:
+            print("***")
+            print("Warning: skipeveryn was set to {} in original trajectory calculation - this will decrease the accuracy of the guiding center reanalysis!".format(skipeveryn))
+            print("***")
 else:
     print("Starting new pt solution:")
     #launch = input("Ready to launch? (press enter)")
@@ -201,7 +219,7 @@ else:
     resultfile.setup(config.datadic, tracklist)
 
     #obsolete, but we can still write out a tracklist in plain text:
-    config.saveas(outdir + runname + "tracklist.txt", towrite = tracklist)
+    #config.saveas(outdir + runname + "tracklist.txt", towrite = tracklist)
     print()
 
 
@@ -240,9 +258,14 @@ for pt_id in tracklist_ID:
     print("Tracking {} #{} / {}".format(particletype, pt_id+1, numberoftracks))
     print("#")
     bfield.range_adequate = True
-    if (checkcodes[pt_id] > 0):
+    if (checkcodes[pt_id] > 0) and not extractgc:
         print("Skipping already-calculated track ID", pt_id)
         continue
+    elif (checkcodes[pt_id] == 1) and extractgc:
+        print("Reanalyzing track ID {} to extract GC".format(pt_id))
+    elif (checkcodes[pt_id] != 1) and extractgc:
+        print("Error: trying to extract GC from track ID {}, but the track has a check code of {}".format(pt_id, checkcodes[pt_id]))
+        sys.exit()
 
     #particle-specific information:
     id = metadata['tracklist_ID'][pt_id]
@@ -282,6 +305,40 @@ for pt_id in tracklist_ID:
         tracklist_mu_changes[pt_id] = mu
         resultfile.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
 
+
+    #
+    #   Extract guiding center from previously-completed simulation:
+    #
+    if extractgc:
+        #calculate initial momentum and relativistic mass:
+        x0_GC = particle.calculate_initial_GC()
+        B_GC = np.linalg.norm(bfield.getBE(*x0_GC, 0)[:3])
+        p0 = particle.calculate_initial_momentum(B_GC)
+        gamma = np.sqrt(1 + (np.linalg.norm(p0)/(particle.m0 * pt_tools.constants.c))**2)
+        massr = particle.m0#gamma*particle.m0
+
+        times, position = resultfile.read_track(pt_id, False)
+        
+        #infer momentum from previously calculated trajectory:
+        velocity = (position[1:] - position[:-1])/(times[1:, np.newaxis] - times[:-1, np.newaxis])
+        gamma = 1.0/(np.sqrt(1-velocity*velocity/(pt_tools.constants.c**2)))
+        momentum = gamma * particle.m0 * velocity
+
+        times = times[:-1]
+        position = position[:-1]
+
+        particle.times = times
+        particle.pt = list(np.hstack((position, momentum)))
+        resultfile_GC.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
+        
+        code_success = pt_fp.extract_GC_only(particle, bfield)
+        particle.times = particle.gc_times
+        particle.pt = particle.gc_pos
+
+        resultfile_GC.add_track(pt_id, particle, checkcode=code_success, compressmethod="gzip", skipeveryn=skipeveryn)
+        count += 1
+        continue
+
     #
     #   Check the energy and pitch angle:
     #
@@ -318,6 +375,7 @@ for pt_id in tracklist_ID:
         if storegc:
             particle.times = particle.gc_times
             particle.pt = particle.gc_pos
+
     #
     #   Store the particle track in the HDF5 file:
     #
