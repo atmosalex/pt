@@ -182,7 +182,8 @@ if len(continuefrom):
         resultfile_GC.setup(config.datadic, tracklist_existing)
         if skipeveryn > 1:
             print("***")
-            print("Warning: skipeveryn was set to {} in original trajectory calculation - this will decrease the accuracy of the guiding center reanalysis!".format(skipeveryn))
+            print("Warning: skipeveryn was set to {} in original trajectory calculation...".format(skipeveryn))
+            print("","this will limit the accuracy of the guiding center reanalysis!")
             print("***")
 else:
     print("Starting new pt solution:")
@@ -261,11 +262,8 @@ for pt_id in tracklist_ID:
     if (checkcodes[pt_id] > 0) and not extractgc:
         print("Skipping already-calculated track ID", pt_id)
         continue
-    elif (checkcodes[pt_id] == 1) and extractgc:
+    elif extractgc:
         print("Reanalyzing track ID {} to extract GC".format(pt_id))
-    elif (checkcodes[pt_id] != 1) and extractgc:
-        print("Error: trying to extract GC from track ID {}, but the track has a check code of {}".format(pt_id, checkcodes[pt_id]))
-        sys.exit()
 
     #particle-specific information:
     id = metadata['tracklist_ID'][pt_id]
@@ -303,37 +301,42 @@ for pt_id in tracklist_ID:
 
         #update tracklist and H5 file with mu:
         tracklist_mu_changes[pt_id] = mu
-        resultfile.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
+        if checkcodes[pt_id] == 0:
+            #update if new:
+            resultfile.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
 
 
     #
     #   Extract guiding center from previously-completed simulation:
     #
     if extractgc:
-        #calculate initial momentum and relativistic mass:
-        x0_GC = particle.calculate_initial_GC()
-        B_GC = np.linalg.norm(bfield.getBE(*x0_GC, 0)[:3])
-        p0 = particle.calculate_initial_momentum(B_GC)
-        gamma = np.sqrt(1 + (np.linalg.norm(p0)/(particle.m0 * pt_tools.constants.c))**2)
-        massr = particle.m0#gamma*particle.m0
-
-        times, position = resultfile.read_track(pt_id, False)
-        
-        #infer momentum from previously calculated trajectory:
-        velocity = (position[1:] - position[:-1])/(times[1:, np.newaxis] - times[:-1, np.newaxis])
-        gamma = 1.0/(np.sqrt(1-velocity*velocity/(pt_tools.constants.c**2)))
-        momentum = gamma * particle.m0 * velocity
-
-        times = times[:-1]
-        position = position[:-1]
-
-        particle.times = times
-        particle.pt = list(np.hstack((position, momentum)))
         resultfile_GC.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
-        
-        code_success = pt_fp.extract_GC_only(particle, bfield)
-        particle.times = particle.gc_times
-        particle.pt = particle.gc_pos
+
+        if checkcodes[pt_id] == 1: #if the track has been successfully calculated
+            #calculate initial momentum and relativistic mass:
+            x0_GC = particle.calculate_initial_GC()
+            B_GC = np.linalg.norm(bfield.getBE(*x0_GC, 0)[:3])
+            p0 = particle.calculate_initial_momentum(B_GC)
+            gamma = np.sqrt(1 + (np.linalg.norm(p0)/(particle.m0 * pt_tools.constants.c))**2)
+            massr = particle.m0#gamma*particle.m0
+
+            times, position = resultfile.read_track(pt_id, False)
+            
+            #infer momentum from previously calculated trajectory:
+            velocity = (position[1:] - position[:-1])/(times[1:, np.newaxis] - times[:-1, np.newaxis])
+            gamma = 1.0/(np.sqrt(1-velocity*velocity/(pt_tools.constants.c**2)))
+            momentum = gamma * particle.m0 * velocity
+
+            times = times[:-1]
+            position = position[:-1]
+
+            particle.times = times
+            particle.pt = list(np.hstack((position, momentum)))
+            code_success = pt_fp.extract_GC_only(particle, bfield)
+            particle.times = particle.gc_times
+            particle.pt = particle.gc_pos
+        else:
+            print("Warning: could not extract GC for particle track ID {}".format(pt_id))
 
         resultfile_GC.add_track(pt_id, particle, checkcode=code_success, compressmethod="gzip", skipeveryn=skipeveryn)
         count += 1
