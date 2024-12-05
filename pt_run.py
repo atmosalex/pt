@@ -334,6 +334,7 @@ for pt_id in tracklist_ID:
             particle.pt = particle.gc_pos
         else:
             print("Warning: could not extract GC for particle track ID {}".format(pt_id))
+            code_success = checkcodes[pt_id]
 
         resultfile_GC.add_track(pt_id, particle, checkcode=code_success, compressmethod="gzip", skipeveryn=skipeveryn)
         count += 1
