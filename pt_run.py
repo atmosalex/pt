@@ -183,6 +183,7 @@ if len(continuefrom):
         if skipeveryn > 1:
             print("Warning: skipeveryn was set to {} in original trajectory calculation...".format(skipeveryn))
             print("","this will be accounted for, but may limit the accuracy of the guiding center reanalysis")
+else:
     print("Starting new pt solution:")
     #launch = input("Ready to launch? (press enter)")
     if type(runname) == type(None):
@@ -335,6 +336,7 @@ for pt_id in tracklist_ID:
         else:
             print("Warning: could not extract GC for particle track ID {}".format(pt_id))
             code_success = checkcodes[pt_id]
+
 
         resultfile_GC.add_track(pt_id, particle, checkcode=code_success, compressmethod="gzip", skipeveryn=skipeveryn)
         count += 1
