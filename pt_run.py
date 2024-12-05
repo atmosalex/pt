@@ -181,11 +181,8 @@ if len(continuefrom):
         resultfile_GC = pt_tools.HDF5_pt(filename_hdf5_GC)
         resultfile_GC.setup(config.datadic, tracklist_existing)
         if skipeveryn > 1:
-            print("***")
             print("Warning: skipeveryn was set to {} in original trajectory calculation...".format(skipeveryn))
-            print("","this will limit the accuracy of the guiding center reanalysis!")
-            print("***")
-else:
+            print("","this will be accounted for, but may limit the accuracy of the guiding center reanalysis")
     print("Starting new pt solution:")
     #launch = input("Ready to launch? (press enter)")
     if type(runname) == type(None):
@@ -332,7 +329,7 @@ for pt_id in tracklist_ID:
 
             particle.times = times
             particle.pt = list(np.hstack((position, momentum)))
-            code_success = pt_fp.extract_GC_only(particle, bfield)
+            code_success = pt_fp.extract_GC_only(particle, bfield, existing_skipeveryn=skipeveryn)
             particle.times = particle.gc_times
             particle.pt = particle.gc_pos
         else:

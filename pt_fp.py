@@ -355,14 +355,14 @@ def get_bouncecapped_trajectory(tocap_time, tocap_pt, idx_newbounce_start = 0, r
 #
 #     return 1
 
-def extract_GC_only(particle, bfield):
+def extract_GC_only(particle, bfield, existing_skipeveryn=1):
     if (not particle.storetrack):
         print("Error: cannot calculate the GC trajectory because the particle object has no track stored")
         print("", "skipping...")
         return 2
 
     t0 = 0.
-    tsperorbit = particle.recommended_tsperorbit
+    tsperorbit = particle.recommended_tsperorbit//existing_skipeveryn
     x0_GC = particle.calculate_initial_GC()
     B_GC = bfield.getBE(*x0_GC, t0)[:3]
     p0 = particle.calculate_initial_momentum(B_GC)
