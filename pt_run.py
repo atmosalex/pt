@@ -25,12 +25,14 @@ parser = argparse.ArgumentParser(description='Get configuration file')
 parser.add_argument("--config",type=str, required=True)
 parser.add_argument("--runname",type=str, required=False)
 parser.add_argument("--extractgc", required=False, action='store_true')
+parser.add_argument("--repair", type=int, required=False, default=-1)
 
 args = parser.parse_args()
 
 configfile = args.config
 runname = args.runname
 extractgc = args.extractgc
+repair = args.repair
 #-----------------------------------------------------------------------------+
 
 #
@@ -257,7 +259,7 @@ for pt_id in tracklist_ID:
     print("Tracking {} #{} / {}".format(particletype, pt_id+1, numberoftracks))
     print("#")
     bfield.range_adequate = True
-    if (checkcodes[pt_id] > 0) and not extractgc:
+    if (checkcodes[pt_id] > 0) and not extractgc and not repair == pt_id:
         print("Skipping already-calculated track ID", pt_id)
         continue
     elif extractgc:

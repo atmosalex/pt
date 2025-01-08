@@ -451,13 +451,31 @@ class HDF5_pt:
         checklist = fo['tracklist_check']
         checkcode_existing = int(checklist[id])
 
+        newgroupname = self.group_name_tracks + "/" + str(id)
         if (checkcode_existing != 0):
-            print("Error: trying to append a new track over an existing solution with ID", id, ", check code", checkcode_existing)
-            fo.close()
-            sys.exit(1)
-        checklist[id] = checkcode
+            #print("Error: trying to append a new track over an existing solution with ID", id, ", check code", checkcode_existing)
+            #fo.close()
+            #sys.exit(1)
+            print("Warning: overwriting an existing solution with ID", id, ", check code", checkcode_existing)
+            checklist[id] = checkcode
+            newgroup = fo[newgroupname]
 
-        newgroup = fo.create_group(self.group_name_tracks + "/" + str(id))
+            if not newgroupname in fo:
+                newgroup = fo.create_group(newgroupname)
+            else:
+                if 'time' in fo[newgroupname]:
+                    del fo[newgroupname+'/time']
+                if 'position' in fo[newgroupname]:
+                    del fo[newgroupname+'/position']
+                if self.dataset_name_muenKalphaL0 in fo[newgroupname]:
+                    del fo[newgroupname+'/'+self.dataset_name_muenKalphaL0]
+                if self.dataset_name_muenKalphaL1 in fo[newgroupname]:
+                    del fo[newgroupname+'/'+self.dataset_name_muenKalphaL1]
+        else:
+            #new data:
+            checklist[id] = checkcode
+            newgroup = fo.create_group(newgroupname)
+
         #newgroup.attrs['compressed'] = np.string_(compressmethod)
         newgroup.create_dataset('time', data=times, compression = compressmethod)
         newgroup.create_dataset('position', data=pt, compression = compressmethod)
