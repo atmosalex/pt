@@ -1,9 +1,5 @@
 # **Trajectory Redistribution In Phase Space**
 
-<video controls>
-  <source src="misc/19910324.mp4" type="video/mp4">
-</video>
-
 # Authorship and Citation 
 
 This project was developed by Alexander Lozinski. The Boris solver in `pt_pushers.py` was contributed by Ravi Desai.
