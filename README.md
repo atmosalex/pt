@@ -1,7 +1,6 @@
 # **Trajectory Redistribution In Phase Space**
 
-<video src="https://github.com/atmosalex/pt/misc/19910324.mp4"></video>
-ok
+<video src="https://github.com/atmosalex/pt/blob/main/misc/19910324.mp4"></video>
 
 
 # Authorship and Citation 
