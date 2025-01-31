@@ -198,7 +198,7 @@ else:
 
     #copy the configuration file but with the new run name at the end, and the solution name inside to continue from:
     config.datadic[config.continuefrom_kw] = filename_hdf5
-    comments = ["Copy and paste this file to the directory containing pt_handler.py to resume this simulation"]
+    comments = ["resume a partially complete simluation using this config file"]
     config.saveas(outdir + runname + "config.txt", topcomments=comments)
 
     #generate a unique number for each track required to complete this solution:

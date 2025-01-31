@@ -1,10 +1,21 @@
-# **British Antarctic Survey Energetic Particle Tracer**
+# **Trajectory Redistribution In Phase Space**
 
-# Authorship
+# Authorship and Citation 
 
-Developed by Alexander R. Lozinski (lozinskialexander@gmail.com).
+This project was developed by Alexander Lozinski. The Boris solver in `pt_pushers.py` was contributed by Ravi Desai.
 
-Code in the boris\_solver\_example/ directory was contributed by Ravindra T. Desai and adapted to form part of the solver\_boris(...) function in pt\_fp.py where indicated by comments in that file.
+Please cite this code as follows:
+
+```
+@misc{TRIPS25,
+  author = {Lozinski, Alexander R and Desai, Ravindra T},
+  title = {Trajectory Redistribution In Phase Space Python Code}, 
+  year = {2025},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/atmosalex/pt}}
+}
+```
 
 # Usage
 
@@ -14,7 +25,7 @@ This set of scripts can be used to solve electron or proton particle trajectorie
 2. Run python pt\_run.py --config configs/example1.txt, where configs/example1.txt is replaced by the local path to the desired configuration file. Particle trajectories will be solved and output to the pt\_solutions/ directory in a HDF5-format file.
 3. Optionally, plot the trajectory (if stored) by running python pt\_plot.py --solution pt\_solutions/example1\_solutions.h5, where pt\_solutions/example1.h5 is replaced by the local path to the solution file.
 
-The configuration file allows a great deal of flexibility, with the user able to control the initial distribution of particles in gyro, bounce and drift phase independently, and make use of advanced features such as re-calculating the values of adiabatic invariants following a given simulation to directly study non-adiabatic redistribution due to trapping limits, etc. To help familiarise the user, five example configuration files and their corresponding solutions are included with a brief description of each given in the Example Configurations section below.
+The configuration file allows a great deal of flexibility, with the user able to control the initial distribution of particles in gyro, bounce and drift phase independently, and re-calculate the values of adiabatic invariants following a simulation to directly study non-adiabatic redistribution. See the examples below.
 
 # Dependencies
 
@@ -35,7 +46,7 @@ A configuration file is formatted like a CSV file with each line following the s
 where **keyword** is a string, typed without quotation marks, describing some physical parameter, and **parameter** is some value assigned to the variable represented by **keyword**. Blank lines and lines beginning with # are ignored.
 
 
-Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **lmin**, **lmax**, **lsize**, **amin**, **amax**, **asize**, **logmumin**, **logmumax**, **dlogmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **fieldpath**, **emin**, **emax**, **skipeveryn**, **continuefrom**.
+Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **reverse**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **Lmin**, **Lmax**, **nL**, **amin**, **amax**, **na**, **logmumin**, **logmumax**, **nmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **fieldpath**, **emin**, **emax**, **skipeveryn**, **continuefrom**, **override energy axis**.
 
 The meaning of each keyword is indicated below, and examples of acceptable parameter values are indicated for each in bold font. Specifying a parameter value is optional for some keywords even though each keyword must appear, and in this case **parameter** can be left blank.
 
@@ -45,7 +56,9 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **orbit** describes the type of orbit to simulate: **b** for a single bounce, **d** for a single drift, or **t** for a custom duration.
 
-- **duration to solve**, when orbit type **t** is specified, is the trajectory duration as an integer or float value in units of seconds, such as **180** for 180 seconds, etc.
+- **duration to solve**, when orbit type **t** is specified, this is the trajectory duration as an integer or float value in units of seconds, such as **180** for 180 seconds, etc.
+
+- **reverse** controls whether the particle is traced forward or backwards in time, accepted values are **n** or **y** respectively.
 
 - **store trajectory** controls whether or not the trajectory of the particle is saved in the output file, accepted values are **y** or **n**. Files can potentially become large for long trajectories when **y** is specified.
 
@@ -57,11 +70,11 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **year**, **month** and **day** describe the epoch of the IGRF coefficients used to calculate the dipole field moment. The parameter values must be integer, integer, integer respectively i.e. **2015**, **1**, **1** for 1st Jan. 2015.
 
-- **lmin**, **lmax** and **lsize** set up a grid in the L coordinate to populate with particles. The parameter values must be float, float, integer respectively i.e. **2.0**, **2.0**, **1** to consider particles only at L=2, or **2.0, 3.0**, **11** to evenly space particles between L=2 and L=3 at 11 coordinates.
+- **Lmin**, **Lmax** and **nL** set up a grid in the L coordinate to populate with particles. The parameter values must be float, float, integer respectively i.e. **2.0**, **2.0**, **1** to consider particles only at L=2, or **2.0, 3.0**, **11** to evenly space particles between L=2 and L=3 at 11 coordinates.
 
-- **amin**, **amax** and **asize** set up a grid in the equatorial pitch angle coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of degrees i.e. **90**, **90**, **1** to consider equatorially mirroring particles only, or **10.0, 90.0**, **11** to evenly space particles between aeq=10 and aeq=90 at 11 coordinates.
+- **amin**, **amax** and **na** set up a grid in the equatorial pitch angle coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of degrees i.e. **90**, **90**, **1** to consider equatorially mirroring particles only, or **10.0, 90.0**, **11** to evenly space particles between aeq=10 and aeq=90 at 11 coordinates.
 
-- **logmumin**, **logmumax** and **dlogmu** set up a grid in the mu coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of log10(mu / 1MeV/G) i.e. **2**, **2**, **1** to consider 100MeV/G particles only, or **2, 3**, **11** to log space particles between mu=100MeV/G and mu=1000MeV/G at 11 coordinates.
+- **logmumin**, **logmumax** and **nmu** set up a grid in the mu coordinate to populate with particles. The parameter values must be float, float, integer respectively in units of log10(mu / 1MeV/G) i.e. **2**, **2**, **1** to consider 100MeV/G particles only, or **2, 3**, **11** to log space particles between mu=100MeV/G and mu=1000MeV/G at 11 coordinates.
 
 - **nphase\_gyro**, **nphase\_bounce** and **nphase\_drift** control the phase distribution of particles across the particle grid along each of the three types of periodic motion. The parameter values must be integer, integer, integer respectively i.e. **1**, **1**, **1** to consider only a single particle at each of the adiabatic coordinates generated by the previously described grid options, or **1**, **1**, **24** to consider 24 particles distributed evenly in drift phase at each set of adiabatic coordinates, etc.
 
@@ -75,34 +88,35 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **continuefrom** is optional. If a previous simulation is interrupted, this keyword can be used to continue from it by specifying the name of the output file, i.e. **pt\_solutions/pt\_20230117-091223\_solutions.h5**. Any trajectory that was already solved before will be skipped, and the file will be updated as new trajectories are solved.
 
+- **override energy axis** is optional. This can be set to a list of values separated by commas, i.e. "2.5, 5, 6" to study the three energies 2.5, 5 and 6MeV. If it is set, this will replace the mu grid. This can be used to initialize particles at energies corresponding to spacecraft instrument energy channels.
+
 # Solutions
 
 Solutions are stored as .h5 files in the pt\_solutions/ directory, with a name generated based on the time at which they were run. This behaviour can be overridden by supplying the --runname argument, i.e. python pt\_run.py --config configs/example1.txt --runname custom\_name, where custom\_name will be the new name of the solution in pt\_solutions/.
 
 The configuration is also stored for each solution with a corresponding name, i.e. the file pt\_20230117-105105\_solutions.h5 will be accompanied by pt\_20230117-105105\_config.txt, which is a backup of the configuration file used to launch the simulation.
 
-A plaintext tracklist file will also accompany the .h5 file, containing a list of the solved particle trajectories in terms of each particle’s basic properties, i.e. pt\_20230117-105105\_tracklist.txt.
-
-Each .h5 file is a HDF5 database storing the properties of each particle, along with their solved trajectories in the MAG frame when this option is set. The structure of an .h5 file can be printed by running python pt\_plot.py --solution pt\_solutions/example1\_solutions.h5, where pt\_solutions/example1.h5 is replaced by the local path to the solution file. The output of this command for the example1 solution (see Example Configurations) is:
+Each .h5 file is a HDF5 database storing the properties of each particle, along with their solved trajectories in the MAG frame when this option is set. The structure of the .h5 file produced for the example1 solution (see Example Configurations) is:
 
 ```
 amax = 17.0
 amin = 85.0
-asize = 3
+na = 3
 continuefrom = './pt\_solutions/pt\_20230117-105105\_solutions.h5'
-day = 1dlogmu = 1
+day = 1nmu = 1
 duration to solve = 0.0
-emax = 400.0emin = 0.1
+emax = 400.0
+emin = 0.1
 fieldpath = ''
 find initial K = 'n'
 iphase\_bounce = 0.0
 iphase\_drift = 0.0
 iphase\_gyro = 0.25
-lmax = 2.0
-lmin = 2.0
+Lmax = 2.0
+Lmin = 2.0
 logmumax = 2.0
 logmumin = 2.0
-lsize = 1
+nL = 1
 month = 1
 nphase\_bounce = 1
 nphase\_drift = 1
