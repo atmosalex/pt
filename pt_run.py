@@ -231,8 +231,8 @@ else:
 metadata = resultfile.read_root()
 tracklist_ID = metadata['tracklist_ID']
 checkcodes = resultfile.get_solved_ids()
+tracklist_mu_changes = metadata['tracklist_mu'] #recalculated as we iterate through the particles below
 if override_energy_axis.size:
-    tracklist_mu_changes = metadata['tracklist_mu'] #recalculated as we iterate through the particles below
     tracklist_energy = dict(zip(np.arange(tracklist_ID.size), np.repeat(override_energy_axis, ar.size * lr.size * phase_gyro.size * phase_bounce.size * phase_drift.size)))
 
 #
