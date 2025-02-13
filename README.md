@@ -62,7 +62,7 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **orbit** describes the type of orbit to simulate: **b** for a single bounce, **d** for a single drift, or **t** for a custom duration.
 
-- **duration to solve**, when orbit type **t** is specified, this is the trajectory duration as an integer or float value in units of seconds, such as **180** for 180 seconds, etc. Otherwise it is not required to be specified.
+- **duration to solve**, when orbit type **t** is specified, this is the trajectory duration as an integer or float value in units of seconds, such as **180** for 180 seconds, etc. Otherwise its value is ignored but must be specified.
 
 - **reverse** controls whether the particle is traced forward or backwards in time, accepted values are **n** or **y** respectively.
 
