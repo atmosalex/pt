@@ -25,7 +25,7 @@ This set of scripts can be used to solve electron or proton particle trajectorie
 
 The configuration file allows the user to control the initial distribution of particles in gyro, bounce and drift phase independently. The user can also configure a simulation to calculate the values of adiabatic invariants before and after particle tracing. See the examples below.
 
-If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame, where Z=0 will be taken as the magnetic equator. To demonstrate the processing and format required, code is included to calculate the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701). To run this code, execute the following Python commands from the top level directory of the repository, which will produce the file `configs/output_filename.h5`:
+If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame, where Z=0 will be taken as the magnetic equator. To demonstrate the processing and format required, code is included to calculate the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701). To run this code, execute the following Python from the top level directory of the repository, which will produce the file `configs/output_filename.h5`:
 
 ```
 import field_tools
@@ -156,4 +156,4 @@ The following example configuration file is provided in the configs/ directory:
 ## example1.txt
 Simulates two 100MeV/G protons with equatorial pitch angles of 90 degrees at L=4, separated by 180 degrees in drift phase, for one drift orbit. Stores the guiding center of both particles, and calculates the adiabatic invariants before and after the drift orbit.
 
-This example can be run by executing from the top level of the repository directory: `python pt_run.py --config configs/example1.txt --runname example1`
+This example can be run by executing from the top level directory of the repository: `python pt_run.py --config configs/example1.txt --runname example1`
