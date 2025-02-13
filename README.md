@@ -2,9 +2,7 @@
 
 # Authorship and Citation 
 
-This project was developed by Alexander Lozinski. The Boris solver in `pt_pushers.py` was contributed by Ravi Desai.
-
-Please cite this code as follows:
+This project was developed by Alexander R. Lozinski with contributions from Ravindra T. Desai. Please cite as follows:
 
 ```
 @misc{TRIPS25,
@@ -19,13 +17,21 @@ Please cite this code as follows:
 
 # Usage
 
-This set of scripts can be used to solve electron or proton particle trajectories initialised from a grid of adiabatic coordinates. The basic steps are:
+This set of scripts can be used to solve electron or proton particle trajectories initialised from a grid of adiabatic coordinates. If using a dipole field, the steps are:
 
 1. Write a configuration file (see Configuration section)
 2. Run python pt\_run.py --config configs/example1.txt, where configs/example1.txt is replaced by the local path to the desired configuration file. Particle trajectories will be solved and output to the pt\_solutions/ directory in a HDF5-format file.
 3. Optionally, plot the trajectory (if stored) by running python pt\_plot.py --solution pt\_solutions/example1\_solutions.h5, where pt\_solutions/example1.h5 is replaced by the local path to the solution file.
 
-The configuration file allows a great deal of flexibility, with the user able to control the initial distribution of particles in gyro, bounce and drift phase independently, and re-calculate the values of adiabatic invariants following a simulation to directly study non-adiabatic redistribution. See the examples below.
+The configuration file allows the user to control the initial distribution of particles in gyro, bounce and drift phase independently. The user can also configure a simulation to calculate the values of adiabatic invariants before and after particle tracing. See the examples below.
+
+If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame, where Z=0 will be taken as the magnetic equator. To demonstrate the processing and format required, code is included to calculate the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701). To run this code, execute the following Python commands from the top level directory of the repository, which will produce the file `configs/output_filename.h5`:
+
+```
+import field_tools
+field_tools.study_march91('configs/output_filename.h5', redo=True)
+```
+
 
 # Dependencies
 
@@ -56,7 +62,7 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **orbit** describes the type of orbit to simulate: **b** for a single bounce, **d** for a single drift, or **t** for a custom duration.
 
-- **duration to solve**, when orbit type **t** is specified, this is the trajectory duration as an integer or float value in units of seconds, such as **180** for 180 seconds, etc.
+- **duration to solve**, when orbit type **t** is specified, this is the trajectory duration as an integer or float value in units of seconds, such as **180** for 180 seconds, etc. Otherwise it is not required to be specified.
 
 - **reverse** controls whether the particle is traced forward or backwards in time, accepted values are **n** or **y** respectively.
 
@@ -96,80 +102,58 @@ Solutions are stored as .h5 files in the pt\_solutions/ directory, with a name g
 
 The configuration is also stored for each solution with a corresponding name, i.e. the file pt\_20230117-105105\_solutions.h5 will be accompanied by pt\_20230117-105105\_config.txt, which is a backup of the configuration file used to launch the simulation.
 
-Each .h5 file is a HDF5 database storing the properties of each particle, along with their solved trajectories in the MAG frame when this option is set. The structure of the .h5 file produced for the example1 solution (see Example Configurations) is:
+Each .h5 file is a HDF5 database storing the properties of each particle, along with their solved trajectories in the MAG frame when this option is set. The structure of the .h5 file produced for the example1 solution (see Example Configuration) is:
 
 ```
-amax = 17.0
-amin = 85.0
-na = 3
-continuefrom = './pt\_solutions/pt\_20230117-105105\_solutions.h5'
-day = 1nmu = 1
-duration to solve = 0.0
-emax = 400.0
-emin = 0.1
-fieldpath = ''
-find initial K = 'n'
-iphase\_bounce = 0.0
-iphase\_drift = 0.0
-iphase\_gyro = 0.25
-Lmax = 2.0
-Lmin = 2.0
-logmumax = 2.0
-logmumin = 2.0
-nL = 1
-month = 1
-nphase\_bounce = 1
-nphase\_drift = 1
-nphase\_gyro = 1
-orbit = 'b'
-re-calculate invariants = 'n'
-skipeveryn = 10
-species = 'p'
-store GC = 'n'
-store trajectory = 'y'
-tracklist\_ID = [0 1 2]
-tracklist\_L = [2. 2. 2.]
-tracklist\_check = [1 1 1]
-tracklist\_mu = [100. 100. 100.]
-tracklist\_pa = [85. 51. 17.]
-tracklist\_pb = [0. 0. 0.]
-tracklist\_pd = [0. 0. 0.]
-tracklist\_pg = [0.25 0.25 0.25]
-tracks:NXgroup
-  0:NXgroup
-    muenKalphaL0 = float64(5)
-    muenKalphaL1 = float64(5)
-    position = float64(4992x3)
-    time = float64(4992)
-  1:NXgroup
-    muenKalphaL0 = float64(5)
-    muenKalphaL1 = float64(5)
-    position = float64(5818x3)
-    time = float64(5818)
-  2:NXgroup
-    muenKalphaL0 = float64(5)
-    muenKalphaL1 = float64(5)
-    position = float64(9339x3)
-    time = float64(9339)
-year = 2015
+Lmax <class 'h5py._hl.dataset.Dataset'>
+Lmin <class 'h5py._hl.dataset.Dataset'>
+amax <class 'h5py._hl.dataset.Dataset'>
+amin <class 'h5py._hl.dataset.Dataset'>
+continuefrom <class 'h5py._hl.dataset.Dataset'>
+day <class 'h5py._hl.dataset.Dataset'>
+duration to solve <class 'h5py._hl.dataset.Dataset'>
+emax <class 'h5py._hl.dataset.Dataset'>
+emin <class 'h5py._hl.dataset.Dataset'>
+fieldpath <class 'h5py._hl.dataset.Dataset'>
+find initial K <class 'h5py._hl.dataset.Dataset'>
+iphase_bounce <class 'h5py._hl.dataset.Dataset'>
+iphase_drift <class 'h5py._hl.dataset.Dataset'>
+iphase_gyro <class 'h5py._hl.dataset.Dataset'>
+logmumax <class 'h5py._hl.dataset.Dataset'>
+logmumin <class 'h5py._hl.dataset.Dataset'>
+month <class 'h5py._hl.dataset.Dataset'>
+nL <class 'h5py._hl.dataset.Dataset'>
+na <class 'h5py._hl.dataset.Dataset'>
+nmu <class 'h5py._hl.dataset.Dataset'>
+nphase_bounce <class 'h5py._hl.dataset.Dataset'>
+nphase_drift <class 'h5py._hl.dataset.Dataset'>
+nphase_gyro <class 'h5py._hl.dataset.Dataset'>
+orbit <class 'h5py._hl.dataset.Dataset'>
+override energy axis <class 'h5py._hl.dataset.Dataset'>
+re-calculate invariants <class 'h5py._hl.dataset.Dataset'>
+reverse <class 'h5py._hl.dataset.Dataset'>
+skipeveryn <class 'h5py._hl.dataset.Dataset'>
+species <class 'h5py._hl.dataset.Dataset'>
+store GC <class 'h5py._hl.dataset.Dataset'>
+store trajectory <class 'h5py._hl.dataset.Dataset'>
+tracklist_ID <class 'h5py._hl.dataset.Dataset'>
+tracklist_L <class 'h5py._hl.dataset.Dataset'>
+tracklist_check <class 'h5py._hl.dataset.Dataset'>
+tracklist_mu <class 'h5py._hl.dataset.Dataset'>
+tracklist_pa <class 'h5py._hl.dataset.Dataset'>
+tracklist_pb <class 'h5py._hl.dataset.Dataset'>
+tracklist_pd <class 'h5py._hl.dataset.Dataset'>
+tracklist_pg <class 'h5py._hl.dataset.Dataset'>
+tracks <class 'h5py._hl.group.Group'>
+year <class 'h5py._hl.dataset.Dataset'>
 ```
 
 
-# Example Configurations
+# Example Configuration
 
-The following example configurations files are provided in the configs/ directory, with brief descriptions below:
+The following example configuration file is provided in the configs/ directory:
 
 ## example1.txt
-Simulates three 100MeV/G protons with equatorial pitch angles of 17, 51 and 85 degrees at L=2. The protons bounce once, grouped closely in longitude.
+Simulates two 100MeV/G protons with equatorial pitch angles of 90 degrees at L=4, separated by 180 degrees in drift phase, for one drift orbit. Stores the guiding center of both particles, and calculates the adiabatic invariants before and after the drift orbit.
 
-## example2.txt
-Simulates 12 100MeV/G protons at the three adiabatic coordinates of the example1 simulation, but distributed in gyro and bounce phase via nphase\_gyro and nphase\_bounce. However, they are still grouped closely in longitude.
-
-## example3.txt
-Simulates 3 100MeV/G protons with equatorial pitch angles of 88 degrees for a single drift period at L=2, evenly spaced in initial drift phase.
-
-## example4.txt
-The same as example3, but storing the guiding centres.
-
-## example5.txt
-Simulates a ~250MeV/G electron at L=6 with an equatorial pitch angle of 50 degrees for 30 seconds, storing only the guiding centre.
+This example can be run by executing from the top level of the repository directory: `python pt_run.py --config configs/example1.txt --runname example1`
