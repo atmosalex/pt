@@ -9,6 +9,7 @@ This project was developed by Alexander R. Lozinski with contributions from Ravi
   author = {Lozinski, Alexander R and Desai, Ravindra T},
   title = {Trajectory Redistribution In Phase Space Python Code}, 
   year = {2025},
+  doi = {10.5281/zenodo.14908242},
   publisher = {GitHub},
   journal = {GitHub repository},
   howpublished = {\url{https://github.com/atmosalex/pt}}
