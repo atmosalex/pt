@@ -47,6 +47,7 @@ def boris_fwd(particle, bfield, dt_solve, tsperorbit, t_limit_exact = True, free
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
         #
         #  the code inside this while loop is based on Ravindra Desai's Boris solver
+        #   see https://doi.org/10.1029/2021JA029802
         #
         #
         #ensure t0, x0, p0 are one timestep behind:
@@ -177,6 +178,7 @@ def boris_bkwd(particle, bfield, dt_solve, tsperorbit, t_limit_exact = True, fre
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
         #
         #  the code inside this while loop is based on Ravindra Desai's Boris solver
+        #   see https://doi.org/10.1029/2021JA029802
         #
         #
         #ensure t0, x0, p0 are one timestep behind:
