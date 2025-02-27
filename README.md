@@ -18,6 +18,8 @@ This project was developed by Alexander R. Lozinski with contributions from Ravi
 
 # Usage
 
+## Overview
+
 This set of scripts can be used to solve electron or proton particle trajectories initialised from a grid of adiabatic coordinates. If using a dipole field, the steps are:
 
 1. Write a configuration file (see Configuration section)
@@ -33,14 +35,27 @@ import field_tools
 field_tools.study_march91('configs/output_filename.h5', redo=True)
 ```
 
+## Options
+
+**The following flags can be supplied:**
+
+`-h` or `--help` shows a summary of options 
+
+`--config [string value]` is used to provide the path to an input configuration file, specify a configuration file with the **continuefrom** keyword set to resume a previously interupted simulation
+
+`--runname [string value]` is used to specify a name for the simulation, which is used to name output files
+
+`--extractgc` when specified will perform a reanalysis of a pre-existing simulation to extract the gyrocenter from each stored particle trajectory and output it to a different file, specify which simulation by using the `config` option to specify a configuration file with the **continuefrom** keyword set to the simulation name
+
+`--repair [integer value]`  is used to re-calculate a specific trajectory ID within a pre-existing file, designed for situations in which a file contains corrupted data
 
 # Dependencies
 
 Python 3 is required to run this set of scripts, and the necessary dependencies can be installed via pip by running:
 
-pip install —upgrade pip
+`pip install —upgrade pip`
 
-pip install -r requirements.txt
+`pip install -r requirements.txt`
 
 # Configuration
 
