@@ -53,7 +53,7 @@ A configuration file is formatted like a CSV file with each line following the s
 where **keyword** is a string, typed without quotation marks, describing some physical parameter, and **parameter** is some value assigned to the variable represented by **keyword**. Blank lines and lines beginning with # are ignored.
 
 
-Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **reverse**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **Lmin**, **Lmax**, **nL**, **amin**, **amax**, **na**, **logmumin**, **logmumax**, **nmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **fieldpath**, **emin**, **emax**, **skipeveryn**, **continuefrom**, **override energy axis**.
+Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **reverse**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **Lmin**, **Lmax**, **nL**, **amin**, **amax**, **na**, **logmumin**, **logmumax**, **nmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **perturbation\_grid**, **emin**, **emax**, **skipeveryn**, **continuefrom**, **override energy axis**.
 
 The meaning of each keyword is indicated below, and examples of acceptable parameter values are indicated for each in bold font. Specifying a parameter value is optional for some keywords even though each keyword must appear, and in this case **parameter** can be left blank.
 
@@ -87,7 +87,7 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **iphase\_gyro**, **iphase\_bounce** and **iphase\_drift** control the initial conditions of phase distribution along each of the three types of periodic motion, normalised between 0 and 1. The parameter values must be float, float, float respectively i.e. **0**, **0**, **0**. Changing from **0**, **0**, **0** to **0.5**, **0.5**, **0.5** will effectively shift the initial phase of each particle by 180 degrees along the gyro, bounce and drift path. In the case of non-zero values for iphase\_bounce, or if nphase\_bounce is greater than 1, the bounce trajectory must be pre-computed before the distribution can be initialised in space, since the path cannot be solved analytically, and this may add computation time.
 
-- **fieldpath** is optional. This experimental feature can be used to load in time-varying electromagnetic fields. Leave blank.
+- **perturbation\_grid** is optional. This experimental feature can be used to load in time-varying electromagnetic fields. Leave blank.
 
 - **emin** and **emax** control the maximum and minimum energy of particles to consider. The parameter values must be float, float respectively with units MeV i.e. **10**, **500** to skip any calculation below 10MeV or above 500MeV.
 
@@ -115,7 +115,7 @@ day <class 'h5py._hl.dataset.Dataset'>
 duration to solve <class 'h5py._hl.dataset.Dataset'>
 emax <class 'h5py._hl.dataset.Dataset'>
 emin <class 'h5py._hl.dataset.Dataset'>
-fieldpath <class 'h5py._hl.dataset.Dataset'>
+perturbation_grid <class 'h5py._hl.dataset.Dataset'>
 find initial K <class 'h5py._hl.dataset.Dataset'>
 iphase_bounce <class 'h5py._hl.dataset.Dataset'>
 iphase_drift <class 'h5py._hl.dataset.Dataset'>

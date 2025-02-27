@@ -161,7 +161,7 @@ class Dipolefield:
         #validated against Spenvis values for IGRF2000: https://www.spenvis.oma.be/help/background/magfield/cd.html
         return constants.RE * np.array([eta, zeta, xi])
 
-class Geofield(Dipolefield):
+class Dipolefield_With_Perturbation(Dipolefield):
     def __init__(self, fileload, reversetime = -1):
         #load the HDF5 file
         v_print("Loading E, B field perturbations from", fileload)
@@ -1076,7 +1076,7 @@ class config_rw:
         self.nphase_gyro_kw = "nphase_gyro"
         self.nphase_bounce_kw = "nphase_bounce"
         self.nphase_drift_kw = "nphase_drift"
-        self.fieldpath_kw = "fieldpath"
+        self.perturbation_grid_kw = "perturbation_grid"
         self.skipeveryn_kw = "skipeveryn"
         self.emin_kw = "emin"
         self.emax_kw = "emax"
@@ -1120,7 +1120,7 @@ class config_rw:
             self.datadic[self.nphase_bounce_kw] = int(self.datadic[self.nphase_bounce_kw][0])
             self.datadic[self.nphase_drift_kw] = int(self.datadic[self.nphase_drift_kw][0])
 
-            self.datadic[self.fieldpath_kw] = str(self.datadic[self.fieldpath_kw][0])
+            self.datadic[self.perturbation_grid_kw] = str(self.datadic[self.perturbation_grid_kw][0])
 
             self.datadic[self.skipeveryn_kw] = int(self.datadic[self.skipeveryn_kw][0])
 

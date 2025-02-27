@@ -134,7 +134,7 @@ def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
     import datetime
     
     #mf_MAG = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=6, alpha=[90])
-    mf_GSE = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=3, alpha=[90])
+    #mf_GSE = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=3, alpha=[90])
     coords = ib.Coords()
 
     

@@ -24,7 +24,7 @@ nphase_drift,2
 iphase_gyro,0.25
 iphase_bounce,0.25
 iphase_drift,0.01666666
-fieldpath,
+perturbation_grid,
 emin,0.1
 emax,400.0
 skipeveryn,10

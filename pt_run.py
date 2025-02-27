@@ -67,7 +67,7 @@ nmu = config.datadic[config.nmu_kw]
 nphase_gyro = config.datadic[config.nphase_gyro_kw]
 nphase_bounce = config.datadic[config.nphase_bounce_kw]
 nphase_drift = config.datadic[config.nphase_drift_kw]
-fieldpath = config.datadic[config.fieldpath_kw]
+perturbation_grid = config.datadic[config.perturbation_grid_kw]
 skipeveryn = config.datadic[config.skipeveryn_kw]
 emin = config.datadic[config.emin_kw]
 emax = config.datadic[config.emax_kw]
@@ -238,11 +238,11 @@ if override_energy_axis.size:
 #
 #   Instantiate magnetic field
 #
-if len(fieldpath): #include non-dipolar field perturbations and time variation from the file
+if len(perturbation_grid): #include non-dipolar field perturbations and time variation from the file
     if reverse:
-        bfield = pt_tools.Geofield(fieldpath, reversetime = duration_solve)
+        bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid, reversetime = duration_solve)
     else:
-        bfield = pt_tools.Geofield(fieldpath)
+        bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid)
     if duration_solve > bfield.field_time[-1]:
         print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
         sys.exit(1)
