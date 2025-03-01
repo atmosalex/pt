@@ -36,12 +36,9 @@ This set of scripts can be used to solve electron or proton particle trajectorie
 
 The configuration file allows the user to control the initial distribution of particles in gyro, bounce and drift phase independently. The user can also configure a simulation to calculate the values of adiabatic invariants before and after particle tracing. See the examples below.
 
-If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame, where Z=0 will be taken as the magnetic equator. To demonstrate the processing and format required, code is included to calculate the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701). To run this code, execute the following Python from the top level directory of the repository, which will produce the file `configs/output_filename.h5`:
-
-```
-import field_tools
-field_tools.study_march91('configs/output_filename.h5', redo=True)
-```
+If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame, where Z=0 will be taken as the magnetic equator. To demonstrate the processing and format required, code is included to generate:
+ * a dipole background field stored on a grid, execute the following Python from the top level directory of the repository: ```import field_tools; field_tools.produce_dipolefield_for_validation_of_customfield()```, this will produce the file `configs/dipolefield_verification.h5`
+ * the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701), execute the following Python from the top level directory of the repository: ```import field_tools; field_tools.study_march91('configs/91field.h5')```, this will produce the file `configs/91field.h5`
 
 ## Options
 
