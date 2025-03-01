@@ -161,12 +161,13 @@ class Dipolefield:
         #validated against Spenvis values for IGRF2000: https://www.spenvis.oma.be/help/background/magfield/cd.html
         return constants.RE * np.array([eta, zeta, xi])
 
+
 class Dipolefield_With_Perturbation(Dipolefield):
-    def __init__(self, fileload, reversetime = -1):
-        #load the HDF5 file
+    def __init__(self, fileload, reversetime=-1):
+        # load the HDF5 file
         v_print("Loading E, B field perturbations from", fileload)
 
-        disk = field_h5.HDF5_field(fileload, existing = True)
+        disk = field_h5.HDF5_field(fileload, existing=True)
 
         t0_ts = disk.read_dataset(disk.group_name_data, "t0")
         t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
@@ -174,48 +175,48 @@ class Dipolefield_With_Perturbation(Dipolefield):
         super().__init__(year_dec)
         self.t0 = t0
 
-        self.field_time = disk.read_dataset(disk.group_name_data, "time")
-        self.field_dt = self.field_time[1] - self.field_time[0]
-        self.field_t_min = self.field_time[0]
-        #self.field_t_max = self.field_time[-1]
+        self.pert_time = disk.read_dataset(disk.group_name_data, "time")
+        self.pert_dt = self.pert_time[1] - self.pert_time[0]
+        self.pert_t_min = self.pert_time[0]
+        # self.pert_t_max = self.pert_time[-1]
 
-        self.field_x = disk.read_dataset(disk.group_name_data, "x")
-        self.field_dx = self.field_x[1] - self.field_x[0]
-        self.field_x_min = self.field_x[0]
-        #self.field_x_max = self.field_x[-1]
+        self.pert_x = disk.read_dataset(disk.group_name_data, "x")
+        self.pert_dx = self.pert_x[1] - self.pert_x[0]
+        self.pert_x_min = self.pert_x[0]
+        # self.pert_x_max = self.pert_x[-1]
 
-        self.field_y = disk.read_dataset(disk.group_name_data, "y")
-        self.field_dy = self.field_y[1] - self.field_y[0]
-        self.field_y_min = self.field_y[0]
-        #self.field_y_max = self.field_y[-1]
+        self.pert_y = disk.read_dataset(disk.group_name_data, "y")
+        self.pert_dy = self.pert_y[1] - self.pert_y[0]
+        self.pert_y_min = self.pert_y[0]
+        # self.pert_y_max = self.pert_y[-1]
 
-        self.field_z = disk.read_dataset(disk.group_name_data, "z")
-        self.field_dz = self.field_z[1] - self.field_z[0]
-        self.field_z_min = self.field_z[0]
-        #self.field_z_max = self.field_z[-1]
+        self.pert_z = disk.read_dataset(disk.group_name_data, "z")
+        self.pert_dz = self.pert_z[1] - self.pert_z[0]
+        self.pert_z_min = self.pert_z[0]
+        # self.pert_z_max = self.pert_z[-1]
 
-        #store solutions:
-        nt = np.size(self.field_time)
-        nx = np.size(self.field_x)
-        ny = np.size(self.field_y)
-        nz = np.size(self.field_z)
-        self.field_BE = np.zeros((6, nt, nx, ny, nz))
-        self.field_BE[0, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwx")
-        self.field_BE[1, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwy")
-        self.field_BE[2, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwz")
-        self.field_BE[3, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ex" )
-        self.field_BE[4, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ey" )
-        self.field_BE[5, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ez" )
+        # store solutions:
+        nt = np.size(self.pert_time)
+        nx = np.size(self.pert_x)
+        ny = np.size(self.pert_y)
+        nz = np.size(self.pert_z)
+        self.pert_BE = np.zeros((6, nt, nx, ny, nz))
+        self.pert_BE[0, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwx")
+        self.pert_BE[1, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwy")
+        self.pert_BE[2, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwz")
+        self.pert_BE[3, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ex")
+        self.pert_BE[4, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ey")
+        self.pert_BE[5, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ez")
 
         if reversetime > 0:
-            #modify calls to int_field so that time becomes reversetime - ti:
+            # modify calls to int_field so that time becomes reversetime - ti:
             self.reversetime = reversetime
             self.tmult = -1
         else:
             self.reversetime = 0
             self.tmult = 1
 
-        v_print("","done\n")
+        v_print("", "done\n")
 
         self.range_adequate = True
 
@@ -223,16 +224,182 @@ class Dipolefield_With_Perturbation(Dipolefield):
         ti = self.reversetime + self.tmult * ti
         # if reversed, time evolution goes backwards from self.reversetime
 
-        #global R_e dg dx dy dz xmint ymint zmint
+        # global R_e dg dx dy dz xmint ymint zmint
+        dx = self.pert_dx
+        dy = self.pert_dy
+        dz = self.pert_dz
+        dt = self.pert_dt
+
+        pxe0 = floor((xi - self.pert_x_min) / dx)
+        pye0 = floor((yi - self.pert_y_min) / dy)
+        pze0 = floor((zi - self.pert_z_min) / dz)
+        pte0 = floor((ti - self.pert_t_min) / dt)
+
+        if pxe0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pye0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pze0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pxe0 > len(self.pert_x) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pye0 > len(self.pert_y) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pze0 > len(self.pert_z) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+
+        xfac = (xi - self.pert_x_min - (pxe0) * dx) / dx;
+        yfac = (yi - self.pert_y_min - (pye0) * dy) / dy;
+        zfac = (zi - self.pert_z_min - (pze0) * dz) / dz;
+        tfac = (ti - self.pert_t_min - (pte0) * dt) / dt;
+
+        # check:
+        # print(self.pert_x[pxe0]/constants.RE, xi/constants.RE, self.pert_x[pxe0+1]/constants.RE, xfac)
+        # print(self.pert_y[pye0]/constants.RE, yi/constants.RE, self.pert_y[pye0+1]/constants.RE, yfac)
+        # print(self.pert_z[pze0]/constants.RE, zi/constants.RE, self.pert_z[pze0+1]/constants.RE, zfac)
+        # print(self.pert_time[pte0], ti, self.pert_time[pte0+1], tfac)
+        # print()
+
+        ns = [0, 0, 0, 0, 0, 0, 0, 0]
+        interp_vals = [0, 0, 0, 0, 0, 0]
+        t_idxs = [pte0, pte0 + 1]
+        t_facs = [1 - tfac, tfac]
+
+        for idxt in range(2):
+            pte = t_idxs[idxt]
+            time_fac = t_facs[idxt]
+            for idx in range(6):
+                ns[0] = self.pert_BE[idx, pte, pxe0, pye0, pze0]
+                ns[1] = self.pert_BE[idx, pte, pxe0 + 1, pye0, pze0]
+                ns[2] = self.pert_BE[idx, pte, pxe0, pye0 + 1, pze0]
+                ns[3] = self.pert_BE[idx, pte, pxe0 + 1, pye0 + 1, pze0]
+                ns[4] = self.pert_BE[idx, pte, pxe0, pye0, pze0 + 1]
+                ns[5] = self.pert_BE[idx, pte, pxe0 + 1, pye0, pze0 + 1]
+                ns[6] = self.pert_BE[idx, pte, pxe0, pye0 + 1, pze0 + 1]
+                ns[7] = self.pert_BE[idx, pte, pxe0 + 1, pye0 + 1, pze0 + 1]
+
+                nsa = ns[0] + (ns[1] - ns[0]) * xfac;
+                nsb = ns[2] + (ns[3] - ns[2]) * xfac;
+                nsc = ns[4] + (ns[5] - ns[4]) * xfac;
+                nsd = ns[6] + (ns[7] - ns[6]) * xfac;
+
+                nsp = nsa + (nsb - nsa) * yfac;
+                nsq = nsc + (nsd - nsc) * yfac;
+
+                interp_val = nsp + (nsq - nsp) * zfac;
+
+                interp_vals[idx] += interp_val * time_fac
+
+        return interp_vals
+
+    def getB_dipole(self, xh, yh, zh):
+        """
+        input: coordinates in m
+        """
+        Mdir_x = 0
+        Mdir_y = 0
+        Mdir_z = -1
+
+        r = sqrt(pow(xh, 2) + pow(yh, 2) + pow(zh, 2))
+        C1 = 1e-7 * self.M / (r ** 3)
+        mr = Mdir_x * xh + Mdir_y * yh + Mdir_z * zh
+        bx = C1 * (3 * xh * mr / (r ** 2) - Mdir_x)
+        by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
+        bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
+
+        return bx, by, bz
+
+    def getBsph_dipole(self, rh, thetah, t=0):
+        """
+        input: coordinates r [m], theta
+        """
+
+        br = -2 * self.B0 * ((self.RE / rh) ** 3) * cos(thetah)
+        btheta = -self.B0 * ((self.RE / rh) ** 3) * sin(thetah)
+
+        return br, btheta
+
+    def getBE(self, xh, yh, zh, t=0):
+        """
+        input: coordinates in m
+        """
+        bx, by, bz = self.getB_dipole(xh, yh, zh)
+
+        bwx0, bwy0, bwz0, qEx, qEy, qEz = self.int_field(xh, yh, zh, t)
+
+        return bx + bwx0, by + bwy0, bz + bwz0, qEx, qEy, qEz
+
+class Customfield(Dipolefield):
+    def __init__(self, fileload, reversetime=-1):
+        # load the HDF5 file
+        v_print("Loading B field from", fileload)
+
+        disk = field_h5.HDF5_field(fileload, existing=True)
+
+        t0_ts = disk.read_dataset(disk.group_name_data, "t0")
+        t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
+        year_dec = dt_to_dec(t0)
+        super().__init__(year_dec) #defines B0, M
+        self.t0 = t0
+
+        self.field_time = disk.read_dataset(disk.group_name_data, "time")
+        self.field_dt = self.field_time[1] - self.field_time[0]
+        self.field_t_min = self.field_time[0]
+
+        self.field_x = disk.read_dataset(disk.group_name_data, "x")
+        self.field_dx = self.field_x[1] - self.field_x[0]
+        self.field_x_min = self.field_x[0]
+
+        self.field_y = disk.read_dataset(disk.group_name_data, "y")
+        self.field_dy = self.field_y[1] - self.field_y[0]
+        self.field_y_min = self.field_y[0]
+
+        self.field_z = disk.read_dataset(disk.group_name_data, "z")
+        self.field_dz = self.field_z[1] - self.field_z[0]
+        self.field_z_min = self.field_z[0]
+
+        # store solutions:
+        nt = np.size(self.field_time)
+        nx = np.size(self.field_x)
+        ny = np.size(self.field_y)
+        nz = np.size(self.field_z)
+        self.field_B = np.zeros((3, nt, nx, ny, nz))
+        self.field_B[0, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bx")
+        self.field_B[1, :, :, :, :] = disk.read_dataset(disk.group_name_data, "By")
+        self.field_B[2, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bz")
+
+        if reversetime > 0:
+            # modify calls to int_field so that time becomes reversetime - ti:
+            self.reversetime = reversetime
+            self.tmult = -1
+        else:
+            self.reversetime = 0
+            self.tmult = 1
+
+        v_print("", "done\n")
+
+        self.range_adequate = True
+
+    def int_field(self, xi, yi, zi, ti):
+        ti = self.reversetime + self.tmult * ti
+        # if reversed, time evolution goes backwards from self.reversetime
+
+        # global R_e dg dx dy dz xmint ymint zmint
         dx = self.field_dx
         dy = self.field_dy
         dz = self.field_dz
         dt = self.field_dt
 
-        pxe0 = floor( (xi - self.field_x_min) / dx )
-        pye0 = floor( (yi - self.field_y_min) / dy )
-        pze0 = floor( (zi - self.field_z_min) / dz )
-        pte0 = floor( (ti - self.field_t_min) / dt )
+        pxe0 = floor((xi - self.field_x_min) / dx)
+        pye0 = floor((yi - self.field_y_min) / dy)
+        pze0 = floor((zi - self.field_z_min) / dz)
+        pte0 = floor((ti - self.field_t_min) / dt)
 
         if pxe0 < 0:
             self.range_adequate = False
@@ -253,10 +420,10 @@ class Dipolefield_With_Perturbation(Dipolefield):
             self.range_adequate = False
             return [0, 0, 0, 0, 0, 0]
 
-        xfac = (xi - self.field_x_min-(pxe0)*dx)/dx;
-        yfac = (yi - self.field_y_min-(pye0)*dy)/dy;
-        zfac = (zi - self.field_z_min-(pze0)*dz)/dz;
-        tfac = (ti - self.field_t_min-(pte0)*dt)/dt;
+        xfac = (xi - self.field_x_min - (pxe0) * dx) / dx;
+        yfac = (yi - self.field_y_min - (pye0) * dy) / dy;
+        zfac = (zi - self.field_z_min - (pze0) * dz) / dz;
+        tfac = (ti - self.field_t_min - (pte0) * dt) / dt;
 
         # check:
         # print(self.field_x[pxe0]/constants.RE, xi/constants.RE, self.field_x[pxe0+1]/constants.RE, xfac)
@@ -266,79 +433,77 @@ class Dipolefield_With_Perturbation(Dipolefield):
         # print()
 
         ns = [0, 0, 0, 0, 0, 0, 0, 0]
-        interp_vals = [0, 0, 0, 0, 0, 0]
-        t_idxs = [pte0, pte0+1]
-        t_facs = [1-tfac, tfac]
-        
+        interp_vals = [0, 0, 0]
+        t_idxs = [pte0, pte0 + 1]
+        t_facs = [1 - tfac, tfac]
+
         for idxt in range(2):
             pte = t_idxs[idxt]
             time_fac = t_facs[idxt]
-            for idx in range(6):
-                ns[0] = self.field_BE[idx, pte, pxe0,  pye0,  pze0  ]
-                ns[1] = self.field_BE[idx, pte, pxe0+1,pye0,  pze0  ]
-                ns[2] = self.field_BE[idx, pte, pxe0,  pye0+1,pze0  ]
-                ns[3] = self.field_BE[idx, pte, pxe0+1,pye0+1,pze0  ]
-                ns[4] = self.field_BE[idx, pte, pxe0,  pye0,  pze0+1]
-                ns[5] = self.field_BE[idx, pte, pxe0+1,pye0,  pze0+1]
-                ns[6] = self.field_BE[idx, pte, pxe0,  pye0+1,pze0+1]
-                ns[7] = self.field_BE[idx, pte, pxe0+1,pye0+1,pze0+1]
+            for idx in range(3):
+                ns[0] = self.field_B[idx, pte, pxe0, pye0, pze0]
+                ns[1] = self.field_B[idx, pte, pxe0 + 1, pye0, pze0]
+                ns[2] = self.field_B[idx, pte, pxe0, pye0 + 1, pze0]
+                ns[3] = self.field_B[idx, pte, pxe0 + 1, pye0 + 1, pze0]
+                ns[4] = self.field_B[idx, pte, pxe0, pye0, pze0 + 1]
+                ns[5] = self.field_B[idx, pte, pxe0 + 1, pye0, pze0 + 1]
+                ns[6] = self.field_B[idx, pte, pxe0, pye0 + 1, pze0 + 1]
+                ns[7] = self.field_B[idx, pte, pxe0 + 1, pye0 + 1, pze0 + 1]
 
-                nsa = ns[0] + (ns[1]-ns[0])*xfac ;
-                nsb = ns[2] + (ns[3]-ns[2])*xfac ;
-                nsc = ns[4] + (ns[5]-ns[4])*xfac ;
-                nsd = ns[6] + (ns[7]-ns[6])*xfac ;
+                nsa = ns[0] + (ns[1] - ns[0]) * xfac;
+                nsb = ns[2] + (ns[3] - ns[2]) * xfac;
+                nsc = ns[4] + (ns[5] - ns[4]) * xfac;
+                nsd = ns[6] + (ns[7] - ns[6]) * xfac;
 
-                nsp = nsa+(nsb-nsa)*yfac ;
-                nsq = nsc+(nsd-nsc)*yfac ;
+                nsp = nsa + (nsb - nsa) * yfac;
+                nsq = nsc + (nsd - nsc) * yfac;
 
-                interp_val = nsp+(nsq-nsp)*zfac ;
+                interp_val = nsp + (nsq - nsp) * zfac;
 
                 interp_vals[idx] += interp_val * time_fac
 
         return interp_vals
 
+    # def getB_dipole(self, xh, yh, zh):
+    #     """
+    #     input: coordinates in m
+    #     """
+    #     Mdir_x = 0
+    #     Mdir_y = 0
+    #     Mdir_z = -1
+    #
+    #     r = sqrt(pow(xh, 2) + pow(yh, 2) + pow(zh, 2))
+    #     C1 = 1e-7 * self.M / (r ** 3)
+    #     mr = Mdir_x * xh + Mdir_y * yh + Mdir_z * zh
+    #     bx = C1 * (3 * xh * mr / (r ** 2) - Mdir_x)
+    #     by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
+    #     bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
+    #
+    #     return bx, by, bz
+    #
+    # def getBsph_dipole(self, rh, thetah, t=0):
+    #     """
+    #     input: coordinates r [m], theta
+    #     """
+    #
+    #     br = -2 * self.B0 * ((self.RE / rh) ** 3) * cos(thetah)
+    #     btheta = -self.B0 * ((self.RE / rh) ** 3) * sin(thetah)
+    #
+    #     return br, btheta
 
-    def getB_dipole(self, xh, yh, zh):
+    def getBE(self, xh, yh, zh, t=0):
         """
         input: coordinates in m
         """
-        Mdir_x = 0
-        Mdir_y = 0
-        Mdir_z = -1
+        #bx, by, bz = self.getB_dipole(xh, yh, zh)
+        bx, by, bz = self.int_field(xh, yh, zh, t)
 
-        r = sqrt( pow(xh,2) + pow(yh,2) + pow(zh,2) )
-        C1 = 1e-7*self.M/(r**3)
-        mr = Mdir_x*xh + Mdir_y*yh + Mdir_z*zh
-        bx = C1*(3*xh*mr/(r**2) - Mdir_x)
-        by = C1*(3*yh*mr/(r**2) - Mdir_y)
-        bz = C1*(3*zh*mr/(r**2) - Mdir_z)
+        return bx, by, bz, 0, 0, 0
 
-        return bx, by, bz
-
-    def getBsph_dipole(self, rh, thetah, t = 0):
-        """
-        input: coordinates r [m], theta
-        """
-
-        br = -2*self.B0 * ((self.RE/ rh)**3) * cos(thetah)
-        btheta = -self.B0 * ((self.RE/ rh)**3) * sin(thetah)
-
-        return br, btheta
-
-    def getBE(self, xh, yh, zh, t = 0):
-        """
-        input: coordinates in m
-        """
-        bx, by, bz = self.getB_dipole(xh, yh, zh)
-
-        bwx0, bwy0, bwz0, qEx, qEy, qEz = self.int_field(xh, yh, zh, t)
-        
-        return bx + bwx0, by + bwy0, bz + bwz0, qEx, qEy, qEz
-
-    # def getE(self, xh, yh, zh, t = -1):
-    #     return 0, 0, 0
-
-
+class Customfield_With_Perturbation(Dipolefield):
+    def __init__(self, bgload, pertload, reversetime=-1):
+        print("not implemented yet!")
+        sys.exit()
 
 class HDF5_pt:
     def __init__(self, filepath, existing = False):
@@ -1077,6 +1242,7 @@ class config_rw:
         self.nphase_bounce_kw = "nphase_bounce"
         self.nphase_drift_kw = "nphase_drift"
         self.perturbation_grid_kw = "perturbation_grid"
+        self.custom_field_grid_kw = "custom_field_grid"
         self.skipeveryn_kw = "skipeveryn"
         self.emin_kw = "emin"
         self.emax_kw = "emax"
@@ -1121,6 +1287,7 @@ class config_rw:
             self.datadic[self.nphase_drift_kw] = int(self.datadic[self.nphase_drift_kw][0])
 
             self.datadic[self.perturbation_grid_kw] = str(self.datadic[self.perturbation_grid_kw][0])
+            self.datadic[self.custom_field_grid_kw] = str(self.datadic[self.custom_field_grid_kw][0])
 
             self.datadic[self.skipeveryn_kw] = int(self.datadic[self.skipeveryn_kw][0])
 

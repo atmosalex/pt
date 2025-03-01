@@ -68,6 +68,7 @@ nphase_gyro = config.datadic[config.nphase_gyro_kw]
 nphase_bounce = config.datadic[config.nphase_bounce_kw]
 nphase_drift = config.datadic[config.nphase_drift_kw]
 perturbation_grid = config.datadic[config.perturbation_grid_kw]
+custom_field_grid = config.datadic[config.custom_field_grid_kw]
 skipeveryn = config.datadic[config.skipeveryn_kw]
 emin = config.datadic[config.emin_kw]
 emax = config.datadic[config.emax_kw]
@@ -239,15 +240,29 @@ if override_energy_axis.size:
 #   Instantiate magnetic field
 #
 if len(perturbation_grid): #include non-dipolar field perturbations and time variation from the file
-    if reverse:
-        bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid, reversetime = duration_solve)
+    if len(custom_field_grid):
+        #NEW
+        if reverse:
+            bfield = pt_tools.Customfield_With_Perturbation(custom_field_grid, perturbation_grid, reversetime = duration_solve)
+        else:
+            bfield = pt_tools.Customfield_With_Perturbation(custom_field_grid, perturbation_grid)
+        if duration_solve > bfield.field_time[-1]:
+            print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
+            sys.exit(1)
     else:
-        bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid)
-    if duration_solve > bfield.field_time[-1]:
-        print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
-        sys.exit(1)
+        if reverse:
+            bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid, reversetime = duration_solve)
+        else:
+            bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid)
+        if duration_solve > bfield.field_time[-1]:
+            print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
+            sys.exit(1)
 else:
-    bfield = pt_tools.Dipolefield(year_dec)
+    if len(custom_field_grid):
+        # NEW
+        bfield = pt_tools.Customfield(custom_field_grid)
+    else:
+        bfield = pt_tools.Dipolefield(year_dec)
 
 #
 #   Instantiate a particle for each coordinate and solve the track:

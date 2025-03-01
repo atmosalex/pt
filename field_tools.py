@@ -1,5 +1,7 @@
 #https://www.researchgate.net/publication/329004945_On_the_Boris_solver_in_particle-in-cell_simulation
 import field_h5
+import pt_tools
+
 field_h5.verbose = False
 from os.path import exists
 import numpy as np
@@ -132,6 +134,7 @@ def nearestidx_sph(field_r, field_theta, field_phi, r0, theta0, phi0):
 def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
     import IRBEM as ib
     import datetime
+    from datetime import timezone
     
     #mf_MAG = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=6, alpha=[90])
     #mf_GSE = ib.MagFields(options=[0,0,0,0,0], verbose=False, kext='T89', sysaxes=3, alpha=[90])
@@ -180,12 +183,13 @@ def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
     #bfield = pt_tools.dipolefield(pt_tools.constants.RE, 2015)
     for t in range(0, nt):
         tn = time[t]
-        t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
+        #t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
+        t_datetime = datetime.datetime.fromtimestamp(tn + t0_ts, tz=timezone.utc)
         print("", "solving", t_datetime)
 
         #calculate the rotation matrix from GSE to MAG at this time:
         rot_GSE_to_MAG = coords.transform([t_datetime, t_datetime, t_datetime], [[1,0,0], [0,1,0], [0,0,1]], 'GSE', 'MAG').T
-        
+
         for i in range(nx):
             x_MAG = x[i] * constants.RE
             for j in range(ny):
@@ -262,8 +266,99 @@ def study_march91(fpath_sol, redo = True):
         solvefield_pulse(march91pulse, fpath_sol, t0_ts, 180, resolution)
         print("", "done")
 
+def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
+    import IRBEM as ib
+    import datetime
+    from datetime import timezone
+    output = "configs/dipolefield_verification.h5"
+    file_exists = exists(output)
 
+    #t0_ts = 669786080.0 # corresponds to beginning of time axis in figure 1, Li et al., 1993
+    t0_ts = 1420070400.0 # corresponds to 2015
 
+    if file_exists and (not redo):
+        print("field is already solved, exiting...")
+        sys.exit(1)
+
+    resolution = (100, 100, 100, 2)
+
+    #mf_MAG_cdip = ib.MagFields(options=[0,0,0,0,5], verbose=False, kext='None', sysaxes=6, alpha=[90])
+    mf_MAG_offdip = ib.MagFields(options=[0,0,0,0,1], verbose=False, kext='None', sysaxes=6, alpha=[90])
+    mf_analytical = pt_tools.Dipolefield(pt_tools.dt_to_dec(datetime.datetime.fromtimestamp(t0_ts, tz=timezone.utc)))
+
+    coords = ib.Coords()
+
+    # create a grid in the GSE frame:
+    # coordinate resolution:
+    nx, ny, nz, nt = resolution
+    # coordinate axes:
+    xlim = 8
+    x = np.linspace(-xlim, xlim, nx)
+    y = np.linspace(-xlim, xlim, ny)
+    z = np.linspace(-xlim, xlim, nz)
+    time = np.linspace(0, dur, nt)
+
+    # coordinate grids:
+    xx, yy, zz = np.meshgrid(x, y, z, sparse=False, indexing='ij')
+    assert np.all(xx[:, 0, 0] == x)
+    assert np.all(yy[0, :, 0] == y)
+    assert np.all(zz[0, 0, :] == z)
+    # finite difference elements:
+    dt = time[1] - time[0]
+    # background perturbation in B:
+    sol_Bx = np.zeros((nt, nx, ny, nz))
+    sol_By = np.zeros((nt, nx, ny, nz))
+    sol_Bz = np.zeros((nt, nx, ny, nz))
+
+    print("memory/storeage required for field (mb) > 3 x {:.2f}mb".format(sol_Bx.nbytes / 1024 / 1024))
+
+    # solution storage on disk:
+    disk = field_h5.HDF5_field(output, existing=file_exists, delete=False)
+    disk.add_dataset(disk.group_name_data, "t0", t0_ts)
+    # solve time evolution:
+    # bfield = pt_tools.dipolefield(pt_tools.constants.RE, 2015)
+    for t in range(0, nt):
+        tn = time[t]
+        #t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
+        t_datetime = datetime.datetime.fromtimestamp(tn + t0_ts, tz=timezone.utc)
+        print("", "solving", t_datetime)
+
+        #calculate the rotation matrix from GEO to MAG at this time:
+        rot_GEO_to_MAG = coords.transform([t_datetime, t_datetime, t_datetime], [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 'GEO', 'MAG').T
+        XYZ = {}
+        for i in range(nx):
+            #x_MAG = x[i] * constants.RE
+            for j in range(ny):
+                #y_MAG = y[j] * constants.RE
+                for k in range(nz):
+                    #z_MAG = z[k] * constants.RE
+                    XYZ['x1'] = x[i]#x_MAG
+                    XYZ['x2'] = y[j]#y_MAG
+                    XYZ['x3'] = z[k]#z_MAG
+                    XYZ['dateTime'] = t_datetime
+                    maginput = {}
+                    B_ = mf_MAG_offdip.get_field_multi(XYZ, maginput)
+                    Bvec = [B_['BxGEO'][0], B_['ByGEO'][0], B_['BzGEO'][0]]
+                    # rotate this vector back into MAG frame:
+                    Bvec_MAG = np.matmul(rot_GEO_to_MAG, np.array(Bvec))/1e9
+
+                    #bx_val, by_val, bz_val, _, _, _ = mf_analytical.getBE(x_MAG, y_MAG, z_MAG)
+                    #Bvec_MAG_val = [bx_val, by_val, bz_val]
+                    sol_Bx[t][i][j][k] = Bvec_MAG[0]
+                    sol_By[t][i][j][k] = Bvec_MAG[1]
+                    sol_Bz[t][i][j][k] = Bvec_MAG[2]
+
+    print("storing fields...")
+    # store axes:
+    disk.add_dataset(disk.group_name_data, "x", x * constants.RE)
+    disk.add_dataset(disk.group_name_data, "y", y * constants.RE)
+    disk.add_dataset(disk.group_name_data, "z", z * constants.RE)
+    disk.add_dataset(disk.group_name_data, "time", time)
+    # store solutions:
+    disk.add_dataset(disk.group_name_data, "Bx", sol_Bx)
+    disk.add_dataset(disk.group_name_data, "By", sol_By)
+    disk.add_dataset(disk.group_name_data, "Bz", sol_Bz)
+    print("", "done")
 
 
 # def solvefield_pulse_sph(pulse, fpath_sol, dur = 160, resolution = [18, 11, 12, 20]):

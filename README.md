@@ -16,6 +16,14 @@ This project was developed by Alexander R. Lozinski with contributions from Ravi
 }
 ```
 
+# Dependencies
+
+Python 3 is required to run this set of scripts, and the necessary dependencies can be installed via pip by running:
+
+`pip install —upgrade pip`
+
+`pip install -r requirements.txt`
+
 # Usage
 
 ## Overview
@@ -23,8 +31,8 @@ This project was developed by Alexander R. Lozinski with contributions from Ravi
 This set of scripts can be used to solve electron or proton particle trajectories initialised from a grid of adiabatic coordinates. If using a dipole field, the steps are:
 
 1. Write a configuration file (see Configuration section)
-2. Run python pt\_run.py --config configs/example1.txt, where configs/example1.txt is replaced by the local path to the desired configuration file. Particle trajectories will be solved and output to the pt\_solutions/ directory in a HDF5-format file.
-3. Optionally, plot the trajectory (if stored) by running python pt\_plot.py --solution pt\_solutions/example1\_solutions.h5, where pt\_solutions/example1.h5 is replaced by the local path to the solution file.
+2. Run `python pt_run.py --config configs/example1.txt`, where `configs/example1.txt` is replaced by the local path to the desired configuration file. Particle trajectories will be solved and output to the `pt_solutions/` directory in a HDF5-format file.
+3. Optionally, plot the trajectory (if stored) by running `python pt_plot.py --solution pt_solutions/example1_solutions.h5`, where `pt_solutions/example1.h5` is replaced by the local path to the solution file.
 
 The configuration file allows the user to control the initial distribution of particles in gyro, bounce and drift phase independently. The user can also configure a simulation to calculate the values of adiabatic invariants before and after particle tracing. See the examples below.
 
@@ -49,14 +57,6 @@ field_tools.study_march91('configs/output_filename.h5', redo=True)
 
 `--repair [integer value]`  is used to re-calculate a specific trajectory ID within a pre-existing file, designed for situations in which a file contains corrupted data
 
-# Dependencies
-
-Python 3 is required to run this set of scripts, and the necessary dependencies can be installed via pip by running:
-
-`pip install —upgrade pip`
-
-`pip install -r requirements.txt`
-
 # Configuration
 
 ## Overview
@@ -68,7 +68,7 @@ A configuration file is formatted like a CSV file with each line following the s
 where **keyword** is a string, typed without quotation marks, describing some physical parameter, and **parameter** is some value assigned to the variable represented by **keyword**. Blank lines and lines beginning with # are ignored.
 
 
-Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **reverse**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **Lmin**, **Lmax**, **nL**, **amin**, **amax**, **na**, **logmumin**, **logmumax**, **nmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **perturbation\_grid**, **emin**, **emax**, **skipeveryn**, **continuefrom**, **override energy axis**.
+Keywords can appear in any order, but all of the following keywords must be present: **species**, **orbit**, **duration to solve**, **reverse**, **store trajectory**, **store GC**, **find initial K**, **re-calculate invariants**, **year**, **month**, **day**, **Lmin**, **Lmax**, **nL**, **amin**, **amax**, **na**, **logmumin**, **logmumax**, **nmu**, **nphase\_gyro**, **nphase\_bounce**, **nphase\_drift**, **iphase\_gyro**, **iphase\_bounce**, **iphase\_drift**, **perturbation\_grid**, **custom\_field\_grid**, **emin**, **emax**, **skipeveryn**, **continuefrom**, **override energy axis**.
 
 The meaning of each keyword is indicated below, and examples of acceptable parameter values are indicated for each in bold font. Specifying a parameter value is optional for some keywords even though each keyword must appear, and in this case **parameter** can be left blank.
 
@@ -102,7 +102,9 @@ The meaning of each keyword is indicated below, and examples of acceptable param
 
 - **iphase\_gyro**, **iphase\_bounce** and **iphase\_drift** control the initial conditions of phase distribution along each of the three types of periodic motion, normalised between 0 and 1. The parameter values must be float, float, float respectively i.e. **0**, **0**, **0**. Changing from **0**, **0**, **0** to **0.5**, **0.5**, **0.5** will effectively shift the initial phase of each particle by 180 degrees along the gyro, bounce and drift path. In the case of non-zero values for iphase\_bounce, or if nphase\_bounce is greater than 1, the bounce trajectory must be pre-computed before the distribution can be initialised in space, since the path cannot be solved analytically, and this may add computation time.
 
-- **perturbation\_grid** is optional. This experimental feature can be used to load in time-varying electromagnetic fields. Leave blank.
+- **perturbation\_grid** is optional. This experimental feature can be used to load in time-varying electromagnetic perturbations. Leave blank.
+
+- **custom\_field\_grid** is optional. This experimental feature can be used to load in time-varying background magnetic fields. Leave blank.
 
 - **emin** and **emax** control the maximum and minimum energy of particles to consider. The parameter values must be float, float respectively with units MeV i.e. **10**, **500** to skip any calculation below 10MeV or above 500MeV.
 
@@ -131,6 +133,7 @@ duration to solve <class 'h5py._hl.dataset.Dataset'>
 emax <class 'h5py._hl.dataset.Dataset'>
 emin <class 'h5py._hl.dataset.Dataset'>
 perturbation_grid <class 'h5py._hl.dataset.Dataset'>
+custom_field_grid <class 'h5py._hl.dataset.Dataset'>
 find initial K <class 'h5py._hl.dataset.Dataset'>
 iphase_bounce <class 'h5py._hl.dataset.Dataset'>
 iphase_drift <class 'h5py._hl.dataset.Dataset'>
