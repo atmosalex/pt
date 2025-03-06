@@ -2,13 +2,12 @@ import pt_tools
 import sys
 import numpy as np
 import pt_fp
-from math import log10
+import field_tools
 from datetime import datetime, timezone
 import argparse
 import os
 from pathlib import Path
 # Groups work like dictionaries, and datasets work like NumPy arrays
-#from pyIGRF import calculate
 from math import pi
 MeV2J = pt_tools.constants.MeV2J
 G2T = pt_tools.constants.G2T
@@ -243,26 +242,26 @@ if len(perturbation_grid): #include non-dipolar field perturbations and time var
     if len(custom_field_grid):
         #NEW
         if reverse:
-            bfield = pt_tools.Customfield_With_Perturbation(custom_field_grid, perturbation_grid, reversetime = duration_solve)
+            bfield = field_tools.Customfield_With_Perturbation(custom_field_grid, perturbation_grid, reversetime = duration_solve)
         else:
-            bfield = pt_tools.Customfield_With_Perturbation(custom_field_grid, perturbation_grid)
+            bfield = field_tools.Customfield_With_Perturbation(custom_field_grid, perturbation_grid)
         if duration_solve > bfield.field_time[-1]:
             print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
             sys.exit(1)
     else:
         if reverse:
-            bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid, reversetime = duration_solve)
+            bfield = field_tools.Dipolefield_With_Perturbation(perturbation_grid, reversetime = duration_solve)
         else:
-            bfield = pt_tools.Dipolefield_With_Perturbation(perturbation_grid)
+            bfield = field_tools.Dipolefield_With_Perturbation(perturbation_grid)
         if duration_solve > bfield.field_time[-1]:
             print("Error: cannot solve for longer than the field is specified ({}s)".format(bfield.field_time[-1]))
             sys.exit(1)
 else:
     if len(custom_field_grid):
         # NEW
-        bfield = pt_tools.Customfield(custom_field_grid)
+        bfield = field_tools.Customfield(custom_field_grid)
     else:
-        bfield = pt_tools.Dipolefield(year_dec)
+        bfield = field_tools.Dipolefield(year_dec)
 
 #
 #   Instantiate a particle for each coordinate and solve the track:

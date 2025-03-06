@@ -40,6 +40,8 @@ If the user wishes to simulate inside a non-dipole field, or include time variat
  * a dipole background field stored on a grid, execute the following Python from the top level directory of the repository: ```import field_tools; field_tools.produce_dipolefield_for_validation_of_customfield()```, this will produce the file `configs/dipolefield_verification.h5`
  * the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701), execute the following Python from the top level directory of the repository: ```import field_tools; field_tools.study_march91('configs/91field.h5')```, this will produce the file `configs/91field.h5`
 
+Both these functions require the [IRBEM library](https://doi.org/10.5281/zenodo.6867552) to be installed.
+
 ## Options
 
 **The following flags can be supplied:**

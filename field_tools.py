@@ -3,116 +3,429 @@ field_h5.verbose = False
 from os.path import exists
 import numpy as np
 import IGRF_tools
-class constants:
-    c = 299792458
-    MeV2J = 1.60218e-13
-    G2T = 1e-4
-    nT2T = 1e-9
-    mu0 = 1.25663706e-6
-    RE = 6.3712e6
-    mass0_proton = 1.67262189821e-27
-    charge_proton = 1.602176620898e-19
+from datetime import datetime, timezone
+from pt_tools import constants, dt_to_dec
+
+verbose = True
+def v_print(*a, **b):
+    """Thread safe print function"""
+
+    if not verbose:
+        return
+    print(*a, **b)
+
 pi = np.pi
 import sys
-from math import cos, sin, sqrt, atan2, tan, atan
-
-class WGS84:
-    """General parameters defined by the WGS84 system"""
-    #WGS84 is aligned closely with GEO (but not quite...)
-    # https://en.wikipedia.org/wiki/World_Geodetic_System
-    #Semimajor axis length (m)
-    a = 6378137.0
-    #Semiminor axis length (m)
-    b = 6356752.3142
-    #Ellipsoid flatness (unitless)
-    f = (a - b) / a
-    #Eccentricity (unitless)
-    e = sqrt(f * (2 - f))
-    #as a matrix
-    M = np.array([[1/(a**2),0,0],[0,1/(a**2),0],[0,0,1/(b**2)]])
-
-def get_rotation_GEO_to_MAG(year_dec):
-    """
-    year_dec : date as a decimal of year, i.e. 2015.25
-
-    returns rotation matrix from GEO to MAG frame
-
-    from the Spenvis help page (https://www.spenvis.oma.be/help/background/coortran/coortran.html),
-    the equation to solve is:
-        T_5 = <phi - 90d, Y> * <lambda, Z>
-
-    <lambda, Z> is a rotation in the plane of the Earth's equator form the Greenwich meridian to the meridian containing the dipole pole
-    <phi - 90d, Y> is a rotation in that meridian from the geographic pole to the dipole pole
-    """
-    g, h = IGRF_tools.arrange_IGRF_coeffs(year_dec)
-    #B0_2 = g[1][0] ** 2 + g[1][1] ** 2 + h[1][1] ** 2
-
-    lmbda = atan(h[1][1]/g[1][1])
-    phi = np.pi/2 - atan((g[1][1]*cos(lmbda) + h[1][1]*sin(lmbda)) / g[1][0])
-
-    R_mer = np.array([[cos(lmbda), -1*sin(lmbda), 0],[sin(lmbda), cos(lmbda), 0], [0,0,1]])
-    R_pole = np.array([[cos(phi-np.pi/2), 0, sin(phi-np.pi/2)],
-                       [0, 1, 0],
-                       [-1 * sin(phi-np.pi/2), 0, cos(phi-np.pi/2)]])
-    T5 = R_pole @ (R_mer @ np.identity(3)).T
-    return T5
-
-    ###validation using IRBEM for year_dec = 2015.0:
-    # import datetime
-    # from datetime import timezone
-    # import IRBEM as ib
-    # t_datetime = datetime.datetime(year=2015, month=1, day=1, tzinfo=timezone.utc)
-    # coords = ib.Coords()
-    # rot_GEO_to_MAG = coords.transform([t_datetime, t_datetime, t_datetime], [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 'GEO', 'MAG').T
-    # print(rot_GEO_to_MAG)
-
-def get_eccentric_centre_GEO(year_dec):
-    """return vector from 0 to eccentric dipole centre in GEO frame [m] """
-    g, h = IGRF_tools.arrange_IGRF_coeffs(year_dec)
-
-    B0_2 = g[1][0] ** 2 + g[1][1] ** 2 + h[1][1] ** 2
-    B0_nT = sqrt(B0_2)
-    #B0_ = B0_ * constants.nT2T
-
-    L0 = 2*g[1][0]*g[2][0] + sqrt(3)*(g[1][1]*g[2][1] + h[1][1]*h[2][1])
-    L1 = -g[1][1]*g[2][0] + sqrt(3)*(g[1][0]*g[2][1] + g[1][1]*g[2][2] + h[1][1]*h[2][2])
-    L2 = -h[1][1]*g[2][0] + sqrt(3)*(g[1][0]*h[2][1] - h[1][1]*g[2][2] + g[1][1]*h[2][2])
-    E = (L0 * g[1][0] + L1*g[1][1] + L2*h[1][1]) / (4*((B0_nT)**2))
-    xi =  (L0 - g[1][0]*E)/(3*((B0_nT)**2))
-    eta = (L1 - g[1][1]*E)/(3*((B0_nT)**2))
-    zeta =(L2 - h[1][1]*E)/(3*((B0_nT)**2))
-
-    # print(L0)
-    # print(L1)
-    # print(L2)
-    # print(E)
-    # print(eta)
-    # print(zeta)
-    # print(xi)
-    #validated against Spenvis values for IGRF2000: https://www.spenvis.oma.be/help/background/magfield/cd.html
-    return constants.RE * np.array([eta, zeta, xi]) #meters
-
-def get_eccentric_centre_MAG(year_dec):
-    x_ed_GEO = get_eccentric_centre_GEO(year_dec)
-    M_GEO_to_MAG = get_rotation_GEO_to_MAG(year_dec)
-    x_ed_MAG = M_GEO_to_MAG @ x_ed_GEO
-    return x_ed_MAG
+from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
 
 
-# class WGS84_atm:
-#     """General parameters defined by the WGS84 system...
-#     plus an approximate atmospheric height added to each axis"""
-#     height_atm = 100000.
-#     #Semimajor axis length (m)
-#     a = WGS84.a + height_atm
-#     #Semiminor axis length (m)
-#     b = WGS84.b + height_atm
-#     #Ellipsoid flatness (unitless)
-#     f = (a - b) / a
-#     #Eccentricity (unitless)
-#     e = sqrt(f * (2 - f))
-#     #as a matrix
-#     M = np.array([[1/(a**2),0,0],[0,1/(a**2),0],[0,0,1/(b**2)]])
+class Dipolefield:
+    def __init__(self, year_dec):
+        self.year_dec = year_dec
+        self.B0, self.M = self.get_B0_m(year_dec)
+        self.field_time = [0]
+
+    def get_dipolelc(self, Lb, atm_height):
+        Ba = (self.B0) * (4 - 3 / Lb) ** (0.5)
+        RE = constants.RE
+        ra = (RE + atm_height) / RE  # ~Earth's surface + atm_height_dipolelc m
+
+        if ra >= Lb:
+            return np.nan
+        else:
+            Ba = (self.B0 / (ra ** 3)) * (4 - 3 * ra / Lb) ** (0.5)
+            dipole_lc = asin(sqrt((self.B0 / Lb ** 3) / Ba)) * 180 / pi
+            return dipole_lc
+
+    def getBE(self, xh, yh, zh, t=0):
+        """
+        input: coordinates in m
+        """
+        Mdir_x = 0
+        Mdir_y = 0
+        Mdir_z = -1
+
+        r = sqrt(pow(xh, 2) + pow(yh, 2) + pow(zh, 2))
+        C1 = 1e-7 * self.M / (r ** 3)
+        mr = Mdir_x * xh + Mdir_y * yh + Mdir_z * zh
+        bx = C1 * (3 * xh * mr / (r ** 2) - Mdir_x)
+        by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
+        bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
+
+        return bx, by, bz, 0, 0, 0
+
+    def get_L(self, r, mag_lat):
+        """
+        takes distance r (Earth radii) and magnetic latitude (radians)
+        returns dipole L
+        """
+        return r / (cos(mag_lat) ** 2)
+
+    def get_B0_m(self, year):
+        """Get the average dipole field strength around Earth's equator and dipole moment. Use like so: B0,m = get_B0_m(2000.0)"""
+        g, h = IGRF_tools.arrange_IGRF_coeffs(year)
+
+        B0_2 = g[1][0] ** 2 + g[1][1] ** 2 + h[1][1] ** 2
+        B0_ = sqrt(B0_2)
+        B0_ = B0_ * constants.nT2T
+        M_ = B0_ * (constants.RE ** 3) * 4 * pi / constants.mu0
+
+        return B0_, M_
+
+
+class Dipolefield_With_Perturbation(Dipolefield):
+    def __init__(self, fileload, reversetime=-1):
+        # load the HDF5 file
+        v_print("Loading E, B field perturbations from", fileload)
+
+        disk = field_h5.HDF5_field(fileload, existing=True)
+
+        t0_ts = disk.read_dataset(disk.group_name_data, "t0")
+        t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
+        year_dec = dt_to_dec(t0)
+        super().__init__(year_dec)
+        self.t0 = t0
+
+        self.pert_time = disk.read_dataset(disk.group_name_data, "time")
+        self.pert_dt = self.pert_time[1] - self.pert_time[0]
+        self.pert_t_min = self.pert_time[0]
+        # self.pert_t_max = self.pert_time[-1]
+
+        self.pert_x = disk.read_dataset(disk.group_name_data, "x")
+        self.pert_dx = self.pert_x[1] - self.pert_x[0]
+        self.pert_x_min = self.pert_x[0]
+        # self.pert_x_max = self.pert_x[-1]
+
+        self.pert_y = disk.read_dataset(disk.group_name_data, "y")
+        self.pert_dy = self.pert_y[1] - self.pert_y[0]
+        self.pert_y_min = self.pert_y[0]
+        # self.pert_y_max = self.pert_y[-1]
+
+        self.pert_z = disk.read_dataset(disk.group_name_data, "z")
+        self.pert_dz = self.pert_z[1] - self.pert_z[0]
+        self.pert_z_min = self.pert_z[0]
+        # self.pert_z_max = self.pert_z[-1]
+
+        # store solutions:
+        nt = np.size(self.pert_time)
+        nx = np.size(self.pert_x)
+        ny = np.size(self.pert_y)
+        nz = np.size(self.pert_z)
+        self.pert_BE = np.zeros((6, nt, nx, ny, nz))
+        self.pert_BE[0, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwx")
+        self.pert_BE[1, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwy")
+        self.pert_BE[2, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bwz")
+        self.pert_BE[3, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ex")
+        self.pert_BE[4, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ey")
+        self.pert_BE[5, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Ez")
+
+        if reversetime > 0:
+            # modify calls to int_field so that time becomes reversetime - ti:
+            self.reversetime = reversetime
+            self.tmult = -1
+        else:
+            self.reversetime = 0
+            self.tmult = 1
+
+        v_print("", "done\n")
+
+        self.range_adequate = True
+
+    def int_field(self, xi, yi, zi, ti):
+        ti = self.reversetime + self.tmult * ti
+        # if reversed, time evolution goes backwards from self.reversetime
+
+        # global R_e dg dx dy dz xmint ymint zmint
+        dx = self.pert_dx
+        dy = self.pert_dy
+        dz = self.pert_dz
+        dt = self.pert_dt
+
+        pxe0 = floor((xi - self.pert_x_min) / dx)
+        pye0 = floor((yi - self.pert_y_min) / dy)
+        pze0 = floor((zi - self.pert_z_min) / dz)
+        pte0 = floor((ti - self.pert_t_min) / dt)
+
+        if pxe0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pye0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pze0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pxe0 > len(self.pert_x) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pye0 > len(self.pert_y) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pze0 > len(self.pert_z) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+
+        xfac = (xi - self.pert_x_min - (pxe0) * dx) / dx;
+        yfac = (yi - self.pert_y_min - (pye0) * dy) / dy;
+        zfac = (zi - self.pert_z_min - (pze0) * dz) / dz;
+        tfac = (ti - self.pert_t_min - (pte0) * dt) / dt;
+
+        # check:
+        # print(self.pert_x[pxe0]/constants.RE, xi/constants.RE, self.pert_x[pxe0+1]/constants.RE, xfac)
+        # print(self.pert_y[pye0]/constants.RE, yi/constants.RE, self.pert_y[pye0+1]/constants.RE, yfac)
+        # print(self.pert_z[pze0]/constants.RE, zi/constants.RE, self.pert_z[pze0+1]/constants.RE, zfac)
+        # print(self.pert_time[pte0], ti, self.pert_time[pte0+1], tfac)
+        # print()
+
+        ns = [0, 0, 0, 0, 0, 0, 0, 0]
+        interp_vals = [0, 0, 0, 0, 0, 0]
+        t_idxs = [pte0, pte0 + 1]
+        t_facs = [1 - tfac, tfac]
+
+        for idxt in range(2):
+            pte = t_idxs[idxt]
+            time_fac = t_facs[idxt]
+            for idx in range(6):
+                ns[0] = self.pert_BE[idx, pte, pxe0, pye0, pze0]
+                ns[1] = self.pert_BE[idx, pte, pxe0 + 1, pye0, pze0]
+                ns[2] = self.pert_BE[idx, pte, pxe0, pye0 + 1, pze0]
+                ns[3] = self.pert_BE[idx, pte, pxe0 + 1, pye0 + 1, pze0]
+                ns[4] = self.pert_BE[idx, pte, pxe0, pye0, pze0 + 1]
+                ns[5] = self.pert_BE[idx, pte, pxe0 + 1, pye0, pze0 + 1]
+                ns[6] = self.pert_BE[idx, pte, pxe0, pye0 + 1, pze0 + 1]
+                ns[7] = self.pert_BE[idx, pte, pxe0 + 1, pye0 + 1, pze0 + 1]
+
+                nsa = ns[0] + (ns[1] - ns[0]) * xfac;
+                nsb = ns[2] + (ns[3] - ns[2]) * xfac;
+                nsc = ns[4] + (ns[5] - ns[4]) * xfac;
+                nsd = ns[6] + (ns[7] - ns[6]) * xfac;
+
+                nsp = nsa + (nsb - nsa) * yfac;
+                nsq = nsc + (nsd - nsc) * yfac;
+
+                interp_val = nsp + (nsq - nsp) * zfac;
+
+                interp_vals[idx] += interp_val * time_fac
+
+        return interp_vals
+
+    def getB_dipole(self, xh, yh, zh):
+        """
+        input: coordinates in m
+        """
+        Mdir_x = 0
+        Mdir_y = 0
+        Mdir_z = -1
+
+        r = sqrt(pow(xh, 2) + pow(yh, 2) + pow(zh, 2))
+        C1 = 1e-7 * self.M / (r ** 3)
+        mr = Mdir_x * xh + Mdir_y * yh + Mdir_z * zh
+        bx = C1 * (3 * xh * mr / (r ** 2) - Mdir_x)
+        by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
+        bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
+
+        return bx, by, bz
+
+    def getBsph_dipole(self, rh, thetah, t=0):
+        """
+        input: coordinates r [m], theta
+        """
+
+        br = -2 * self.B0 * ((self.RE / rh) ** 3) * cos(thetah)
+        btheta = -self.B0 * ((self.RE / rh) ** 3) * sin(thetah)
+
+        return br, btheta
+
+    def getBE(self, xh, yh, zh, t=0):
+        """
+        input: coordinates in m
+        """
+        bx, by, bz = self.getB_dipole(xh, yh, zh)
+
+        bwx0, bwy0, bwz0, qEx, qEy, qEz = self.int_field(xh, yh, zh, t)
+
+        return bx + bwx0, by + bwy0, bz + bwz0, qEx, qEy, qEz
+
+
+class Customfield(Dipolefield):
+    def __init__(self, fileload, reversetime=-1):
+        # load the HDF5 file
+        v_print("Loading B field from", fileload)
+
+        disk = field_h5.HDF5_field(fileload, existing=True)
+
+        t0_ts = disk.read_dataset(disk.group_name_data, "t0")
+        t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
+        year_dec = dt_to_dec(t0)
+        super().__init__(year_dec)  # defines B0, M
+        self.t0 = t0
+
+        self.field_time = disk.read_dataset(disk.group_name_data, "time")
+        self.field_dt = self.field_time[1] - self.field_time[0]
+        self.field_t_min = self.field_time[0]
+
+        self.field_x = disk.read_dataset(disk.group_name_data, "x")
+        self.field_dx = self.field_x[1] - self.field_x[0]
+        self.field_x_min = self.field_x[0]
+
+        self.field_y = disk.read_dataset(disk.group_name_data, "y")
+        self.field_dy = self.field_y[1] - self.field_y[0]
+        self.field_y_min = self.field_y[0]
+
+        self.field_z = disk.read_dataset(disk.group_name_data, "z")
+        self.field_dz = self.field_z[1] - self.field_z[0]
+        self.field_z_min = self.field_z[0]
+
+        # store solutions:
+        nt = np.size(self.field_time)
+        nx = np.size(self.field_x)
+        ny = np.size(self.field_y)
+        nz = np.size(self.field_z)
+        self.field_B = np.zeros((3, nt, nx, ny, nz))
+        self.field_B[0, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bx")
+        self.field_B[1, :, :, :, :] = disk.read_dataset(disk.group_name_data, "By")
+        self.field_B[2, :, :, :, :] = disk.read_dataset(disk.group_name_data, "Bz")
+
+        if reversetime > 0:
+            # modify calls to int_field so that time becomes reversetime - ti:
+            self.reversetime = reversetime
+            self.tmult = -1
+        else:
+            self.reversetime = 0
+            self.tmult = 1
+
+        v_print("", "done\n")
+
+        self.range_adequate = True
+
+    def int_field(self, xi, yi, zi, ti):
+        ti = self.reversetime + self.tmult * ti
+        # if reversed, time evolution goes backwards from self.reversetime
+
+        # global R_e dg dx dy dz xmint ymint zmint
+        dx = self.field_dx
+        dy = self.field_dy
+        dz = self.field_dz
+        dt = self.field_dt
+
+        pxe0 = floor((xi - self.field_x_min) / dx)
+        pye0 = floor((yi - self.field_y_min) / dy)
+        pze0 = floor((zi - self.field_z_min) / dz)
+        pte0 = floor((ti - self.field_t_min) / dt)
+
+        if pxe0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pye0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pze0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pxe0 > len(self.field_x) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pye0 > len(self.field_y) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pze0 > len(self.field_z) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+
+        xfac = (xi - self.field_x_min - (pxe0) * dx) / dx;
+        yfac = (yi - self.field_y_min - (pye0) * dy) / dy;
+        zfac = (zi - self.field_z_min - (pze0) * dz) / dz;
+        tfac = (ti - self.field_t_min - (pte0) * dt) / dt;
+
+        ns = [0, 0, 0, 0, 0, 0, 0, 0]
+        interp_vals = [0, 0, 0]
+        t_idxs = [pte0, pte0 + 1]
+        t_facs = [1 - tfac, tfac]
+
+        for idxt in range(2):
+            pte = t_idxs[idxt]
+            time_fac = t_facs[idxt]
+            for idx in range(3):
+                ns[0] = self.field_B[idx, pte, pxe0, pye0, pze0]
+                ns[1] = self.field_B[idx, pte, pxe0 + 1, pye0, pze0]
+                ns[2] = self.field_B[idx, pte, pxe0, pye0 + 1, pze0]
+                ns[3] = self.field_B[idx, pte, pxe0 + 1, pye0 + 1, pze0]
+                ns[4] = self.field_B[idx, pte, pxe0, pye0, pze0 + 1]
+                ns[5] = self.field_B[idx, pte, pxe0 + 1, pye0, pze0 + 1]
+                ns[6] = self.field_B[idx, pte, pxe0, pye0 + 1, pze0 + 1]
+                ns[7] = self.field_B[idx, pte, pxe0 + 1, pye0 + 1, pze0 + 1]
+
+                nsa = ns[0] + (ns[1] - ns[0]) * xfac;
+                nsb = ns[2] + (ns[3] - ns[2]) * xfac;
+                nsc = ns[4] + (ns[5] - ns[4]) * xfac;
+                nsd = ns[6] + (ns[7] - ns[6]) * xfac;
+
+                nsp = nsa + (nsb - nsa) * yfac;
+                nsq = nsc + (nsd - nsc) * yfac;
+
+                interp_val = nsp + (nsq - nsp) * zfac;
+
+                interp_vals[idx] += interp_val * time_fac
+
+        return interp_vals
+
+    def getBE(self, xh, yh, zh, t=0):
+        """
+        input: coordinates in m
+        """
+        bx, by, bz = self.int_field(xh, yh, zh, t)
+        return bx, by, bz, 0, 0, 0
+
+    def trace_field_to_equator(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE, level=0):
+        max_level = 5
+        max_R = 10 * sqrt(xs ** 2 + ys ** 2 + zs ** 2)
+        xi = xs
+        yi = ys
+        zi = zs
+        tried_reverse = False
+        found_equator = False
+
+        Bvec = self.int_field(xi, yi, zi, ti)
+        absB = np.linalg.norm(Bvec)
+        absB_min = absB
+        while sqrt(xi ** 2 + yi ** 2 + zi ** 2) < max_R:
+            xi += trace_ds * Bvec[0] / absB
+            yi += trace_ds * Bvec[1] / absB
+            zi += trace_ds * Bvec[2] / absB
+
+            Bvec = self.int_field(xi, yi, zi, ti)
+            absB = np.linalg.norm(Bvec)
+            if absB < absB_min:
+                absB_min = absB
+            elif not tried_reverse:
+                # reset with negative step
+                xi = xs
+                yi = ys
+                zi = zs
+                trace_ds = trace_ds * -1
+                tried_reverse = True
+                # print("reversing...")
+            else:
+                xe = xi
+                ye = yi
+                ze = zi
+                found_equator = True
+                break
+
+        if found_equator:
+            return xe, ye, ze
+        elif not found_equator and level < max_level:
+            return self.trace_field_to_equator(xs, ys, zs, ti, trace_ds=trace_ds / 2, level=level + 1)
+        elif not found_equator:
+            print("error: could not find the magnetic equator via field line tracing")
+            sys.exit()
+
+
+class Customfield_With_Perturbation(Dipolefield):
+    def __init__(self, bgload, pertload, reversetime=-1):
+        print("not implemented yet!")
+        sys.exit()
+
 
 class Epulse: #method of Li et al, 1993
     def __init__(self, E0=240e-3, c1=0.8, c2=0.8, c3=8., v0=2.e6, ti=80, phi0=pi/4, d=30.e6):
@@ -275,7 +588,7 @@ def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
     disk.add_dataset(disk.group_name_data, "t0", t0_ts)
 
     #solve time evolution:
-    #bfield = pt_tools.dipolefield(pt_tools.constants.RE, 2015)
+    #bfield = dipolefield(constants.RE, 2015)
     for t in range(0, nt):
         tn = time[t]
         #t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
@@ -361,99 +674,11 @@ def study_march91(fpath_sol, redo = True):
         solvefield_pulse(march91pulse, fpath_sol, t0_ts, 180, resolution)
         print("", "done")
 
-class Earth:
-    def __init__(self):
-        a = 6378137.0 #m
-        b = 6356752.314245 #m
-        inv_flat = 298.257223563
-
-        self.ellipsoid_M_MAG
-        self.ellipsoid_centre_MAG
-
-    def intersection_line_ellipsoid(Q, o, l, c):
-        """
-        calculates lambda for an intersecting line, ellipsoid given by:
-            x = o + lambda * l,
-            (x - c).T * Q * (x - c) = 1
-        respectively, where:
-            o is the origin of the line;
-            c is centre of the ellipsoid;
-            l is direction vector of the line;
-            lambda is parametric distance along the line from o;
-            Q is the ellipsoid matrix.
-
-        all parameters must be defined in the same coordinate system
-
-        only real values are returned as we are dealing with physical space
-        """
-        v = (o - c)
-        # l_col = np.swapaxes(np.array([l]),0,1)
-        # v_col = np.swapaxes(np.array([v]),0,1)
-
-        # quadratic equation in terms of lambda with the following coefficients:
-        # a = l.T * Q * l
-        a = np.matmul(Q, l)
-        a = np.matmul(l, a)
-
-        # b1 = l.T * Q * v
-        b1 = np.matmul(Q, v)
-        b1 = np.matmul(l, b1)
-
-        # b2 = l.T * Q * v
-        b2 = np.matmul(Q, l)
-        b2 = np.matmul(v, b2)
-
-        b = b1 + b2  # actually, b1 and b2 are equal because Q is symmetric in practise (property: a.T Q b == b.T Q a)
-
-        # c = v.T * Q * v
-        c = np.matmul(Q, v)
-        c = np.matmul(v, c)
-
-        p = [a, b, c - 1]
-
-        # disc = b**2 - 4 * a * c
-
-        sols = np.roots(p)
-        return sols[np.isreal(sols)]
-
-    def shoot_Earth(self, p0, p1):
-        # negative tangent to trajectory:
-        l = - (p1 - p0)  # s.t. p1 + l = p0
-        l = l / np.linalg.norm(l)
-        WGS84.M
-        intersection_line_ellipsoid(Q, o, l, c)
-
-        # check the particle is above the surface of the atmosphere at 100km:
-        tospace = self.intersection_line_ellipsoid(self.ellipsoid_M_MAG, self.ellipsoid_centre_MAG + p0, p0 / np.linalg.norm(p0), ellipsoid_centre_MAG)
-        if len(tospace):  # take the smallest POSITIVE root (collision with closest face in the direction of Earth)
-            for solution in tospace:
-                if solution > 0:
-                    belowsurface = True
-                    print("error 1"); sys.exit()
-
-        # calculate the intersection point (if any) between the negative tangent and ellipsoid:
-        # intersection_line_ellipsoid(...) returns the parameter lambda, distance along a vector with unit l until collision
-        lam = self.intersection_line_ellipsoid(self.ellipsoid_M_MAG, p0, l, self.ellipsoid_centre_MAG)
-        positive_solutions = []
-        if len(lam):  # take the smallest POSITIVE root (collision with closest face IN THE DIRECTION OF EARTH, NOT AWAY)
-            for solution in lam:
-                if solution > 0:
-                    positive_solutions.append(solution)
-        else:  # no intersection
-            print("error 2"); sys.exit()
-        if len(positive_solutions):
-            lam = min(positive_solutions)
-        else:  # no intersection in the correct direction
-            print("error 3"); sys.exit()
-
-        atm_hit_point = p0 + lam * l  # mag coordinates
-        atm_hit_point_GEO = np.matmul(R_mag_to_GEO, atm_hit_point)
-
 def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
     import IRBEM as ib
     import datetime
     from datetime import timezone
-    output = "configs/centereddipolefield_verification.h5"
+    output = "configs/dipolefield_verification.h5"
     file_exists = exists(output)
 
     #t0_ts = 669786080.0 # corresponds to beginning of time axis in figure 1, Li et al., 1993
@@ -467,7 +692,7 @@ def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
 
     #mf_MAG_cdip = ib.MagFields(options=[0,0,0,0,5], verbose=False, kext='None', sysaxes=6, alpha=[90])
     mf_MAG_offdip = ib.MagFields(options=[0,0,0,0,1], verbose=False, kext='None', sysaxes=6, alpha=[90])
-    #mf_analytical = pt_tools.Dipolefield(pt_tools.dt_to_dec(datetime.datetime.fromtimestamp(t0_ts, tz=timezone.utc)))
+    #mf_analytical = Dipolefield(pt_tools.dt_to_dec(datetime.datetime.fromtimestamp(t0_ts, tz=timezone.utc)))
 
     coords = ib.Coords()
 
@@ -499,7 +724,7 @@ def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
     disk = field_h5.HDF5_field(output, existing=file_exists, delete=False)
     disk.add_dataset(disk.group_name_data, "t0", t0_ts)
     # solve time evolution:
-    # bfield = pt_tools.dipolefield(pt_tools.constants.RE, 2015)
+    # bfield = dipolefield(constants.RE, 2015)
     for t in range(0, nt):
         tn = time[t]
         #t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
@@ -591,7 +816,7 @@ def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
 
 
 #     #solve time evolution:
-#     #bfield = pt_tools.dipolefield(pt_tools.constants.RE, 2015)
+#     #bfield = dipolefield(constants.RE, 2015)
 #     for t in range(0, nt):
 #         tn = time[t]
 #         for i in range(nr):
