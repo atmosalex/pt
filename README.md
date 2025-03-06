@@ -36,7 +36,7 @@ This set of scripts can be used to solve electron or proton particle trajectorie
 
 The configuration file allows the user to control the initial distribution of particles in gyro, bounce and drift phase independently. The user can also configure a simulation to calculate the values of adiabatic invariants before and after particle tracing. See the examples below.
 
-If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame, where Z=0 will be taken as the magnetic equator. To demonstrate the processing and format required, code is included to generate:
+If the user wishes to simulate inside a non-dipole field, or include time variation in the field, the field must be solved beforehand and stored on a grid in the MAG frame. To demonstrate the processing and format required, code is included to generate:
  * a dipole background field stored on a grid, execute the following Python from the top level directory of the repository: ```import field_tools; field_tools.produce_dipolefield_for_validation_of_customfield()```, this will produce the file `configs/dipolefield_verification.h5`
  * the electromagnetic perturbation [modeled by Li et al. (1993)](https://doi.org/10.1029/93GL02701), execute the following Python from the top level directory of the repository: ```import field_tools; field_tools.study_march91('configs/91field.h5')```, this will produce the file `configs/91field.h5`
 
@@ -117,7 +117,7 @@ Solutions are stored as .h5 files in the pt\_solutions/ directory, with a name g
 
 The configuration is also stored for each solution with a corresponding name, i.e. the file pt\_20230117-105105\_solutions.h5 will be accompanied by pt\_20230117-105105\_config.txt, which is a backup of the configuration file used to launch the simulation.
 
-Each .h5 file is a HDF5 database storing the properties of each particle, along with their solved trajectories in the MAG frame when this option is set. The structure of the .h5 file produced for the example1 solution (see Example Configuration) is:
+Each .h5 file is a HDF5 database storing the properties of each particle, along with their solved trajectories in the MAG frame (if **store trajectory** is set `y`). The structure of the .h5 file produced for the example1 solution (see Example Configuration) is:
 
 ```
 Lmax <class 'h5py._hl.dataset.Dataset'>

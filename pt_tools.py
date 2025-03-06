@@ -1,15 +1,10 @@
 import numpy as np
-#from pyIGRF.loadCoeffs import get_coeffs
-import pyIGRF
 from datetime import datetime, timezone
-import math
 from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
 import sys
 import h5py
 import field_h5
-import field_tools
-from scipy import interpolate
-#from scipy.interpolate import RegularGridInterpolator 
+import IGRF_tools
 
 verbose = True
 def v_print(*a, **b):
@@ -30,56 +25,6 @@ class constants:
     mass0_electron = 9.10938356e-31
     charge_proton = 1.602176620898e-19
     charge_electron = -1* charge_proton
-
-class WGS84:
-    """General parameters defined by the WGS84 system"""
-    #Semimajor axis length (m)
-    a = 6378137.0
-    #Semiminor axis length (m)
-    b = 6356752.3142
-    #Ellipsoid flatness (unitless)
-    f = (a - b) / a
-    #Eccentricity (unitless)
-    e = sqrt(f * (2 - f))
-    #as a matrix
-    M = np.array([[1/(a**2),0,0],[0,1/(a**2),0],[0,0,1/(b**2)]])
-
-def arrange_IGRF_coeffs(coeffs):
-    N = 13
-    g = np.ones((N+1, N+1)) * np.nan
-    h = np.ones((N+1, N+1)) * np.nan
-    idx = 0
-    for n in range(1, N + 1):
-        # n, m=0
-        m = 0
-        g[n, m] = coeffs[idx]
-        # print("g,{},{},{}".format(n,m,coeffs[idx]))
-        idx += 1
-        for m in range(1, n + 1):
-            # n, m=1 to n-1
-            g[n, m] = coeffs[idx]
-            # print("g,{},{},{}".format(n,m,coeffs[idx]))
-            idx += 1
-            h[n, m] = coeffs[idx]
-            # print("h,{},{},{}".format(n,m,coeffs[idx]))
-            idx += 1
-
-    return g, h
-
-class WGS84_atm:
-    """General parameters defined by the WGS84 system...
-    plus an approximate atmospheric height added to each axis"""
-    height_atm = 100000.
-    #Semimajor axis length (m)
-    a = WGS84.a + height_atm
-    #Semiminor axis length (m)
-    b = WGS84.b + height_atm
-    #Ellipsoid flatness (unitless)
-    f = (a - b) / a
-    #Eccentricity (unitless)
-    e = sqrt(f * (2 - f))
-    #as a matrix
-    M = np.array([[1/(a**2),0,0],[0,1/(a**2),0],[0,0,1/(b**2)]])
 
 
 class Dipolefield:
@@ -126,9 +71,7 @@ class Dipolefield:
 
     def get_B0_m(self, year):
         """Get the average dipole field strength around Earth's equator and dipole moment. Use like so: B0,m = get_B0_m(2000.0)"""
-        #g, h = get_coeffs(year)
-        f = interpolate.interp1d(pyIGRF.igrf.time, pyIGRF.igrf.coeffs, fill_value='extrapolate')
-        g, h = arrange_IGRF_coeffs(f(year))
+        g, h = IGRF_tools.arrange_IGRF_coeffs(year)
 
         B0_2 = g[1][0]**2 + g[1][1]**2 + h[1][1]**2
         B0_ = sqrt(B0_2)
@@ -136,30 +79,6 @@ class Dipolefield:
         M_ = B0_ * (constants.RE ** 3) * 4 * pi / constants.mu0
 
         return B0_, M_
-
-    def get_eccentric_centre_GEO(self):
-        """return vector from 0 to eccentric dipole centre in GEO frame [m] """
-        #g, h = get_coeffs(self.year_dec)
-        f = interpolate.interp1d(pyIGRF.igrf.time, pyIGRF.igrf.coeffs, fill_value='extrapolate')
-        g, h = arrange_IGRF_coeffs(f(self.year_dec))
-
-        L0 = 2*g[1][0]*g[2][0] + sqrt(3)*(g[1][1]*g[2][1] + h[1][1]*h[2][1])
-        L1 = -g[1][1]*g[2][0] + sqrt(3)*(g[1][0]*g[2][1] + g[1][1]*g[2][2] + h[1][1]*h[2][2])
-        L2 = -h[1][1]*g[2][0] + sqrt(3)*(g[1][0]*h[2][1] - h[1][1]*g[2][2] + g[1][1]*h[2][2])
-        E = (L0 * g[1][0] + L1*g[1][1] + L2*h[1][1]) / (4*((1e9*self.B0)**2))
-        xi =  (L0 - g[1][0]*E)/(3*((1e9*self.B0)**2))
-        eta = (L1 - g[1][1]*E)/(3*((1e9*self.B0)**2))
-        zeta =(L2 - h[1][1]*E)/(3*((1e9*self.B0)**2))
-
-        # print(L0)
-        # print(L1)
-        # print(L2)
-        # print(E)
-        # print(eta)
-        # print(zeta)
-        # print(xi)
-        #validated against Spenvis values for IGRF2000: https://www.spenvis.oma.be/help/background/magfield/cd.html
-        return constants.RE * np.array([eta, zeta, xi])
 
 
 class Dipolefield_With_Perturbation(Dipolefield):
@@ -425,13 +344,6 @@ class Customfield(Dipolefield):
         zfac = (zi - self.field_z_min - (pze0) * dz) / dz;
         tfac = (ti - self.field_t_min - (pte0) * dt) / dt;
 
-        # check:
-        # print(self.field_x[pxe0]/constants.RE, xi/constants.RE, self.field_x[pxe0+1]/constants.RE, xfac)
-        # print(self.field_y[pye0]/constants.RE, yi/constants.RE, self.field_y[pye0+1]/constants.RE, yfac)
-        # print(self.field_z[pze0]/constants.RE, zi/constants.RE, self.field_z[pze0+1]/constants.RE, zfac)
-        # print(self.field_time[pte0], ti, self.field_time[pte0+1], tfac)
-        # print()
-
         ns = [0, 0, 0, 0, 0, 0, 0, 0]
         interp_vals = [0, 0, 0]
         t_idxs = [pte0, pte0 + 1]
@@ -464,41 +376,56 @@ class Customfield(Dipolefield):
 
         return interp_vals
 
-    # def getB_dipole(self, xh, yh, zh):
-    #     """
-    #     input: coordinates in m
-    #     """
-    #     Mdir_x = 0
-    #     Mdir_y = 0
-    #     Mdir_z = -1
-    #
-    #     r = sqrt(pow(xh, 2) + pow(yh, 2) + pow(zh, 2))
-    #     C1 = 1e-7 * self.M / (r ** 3)
-    #     mr = Mdir_x * xh + Mdir_y * yh + Mdir_z * zh
-    #     bx = C1 * (3 * xh * mr / (r ** 2) - Mdir_x)
-    #     by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
-    #     bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
-    #
-    #     return bx, by, bz
-    #
-    # def getBsph_dipole(self, rh, thetah, t=0):
-    #     """
-    #     input: coordinates r [m], theta
-    #     """
-    #
-    #     br = -2 * self.B0 * ((self.RE / rh) ** 3) * cos(thetah)
-    #     btheta = -self.B0 * ((self.RE / rh) ** 3) * sin(thetah)
-    #
-    #     return br, btheta
-
     def getBE(self, xh, yh, zh, t=0):
         """
         input: coordinates in m
         """
-        #bx, by, bz = self.getB_dipole(xh, yh, zh)
         bx, by, bz = self.int_field(xh, yh, zh, t)
-
         return bx, by, bz, 0, 0, 0
+
+    def trace_field_to_equator(self, xs, ys, zs, ti, trace_ds = 0.75e-4 * constants.RE, level = 0):
+        max_level = 5
+        max_R = 10 * sqrt(xs**2 + ys**2 + zs**2)
+        xi = xs
+        yi = ys
+        zi = zs
+        tried_reverse = False
+        found_equator = False
+
+        Bvec = self.int_field(xi, yi, zi, ti)
+        absB = np.linalg.norm(Bvec)
+        absB_min = absB
+        while sqrt(xi**2 + yi**2 + zi**2) < max_R:
+            xi += trace_ds * Bvec[0]/absB
+            yi += trace_ds * Bvec[1]/absB
+            zi += trace_ds * Bvec[2]/absB
+
+            Bvec = self.int_field(xi, yi, zi, ti)
+            absB = np.linalg.norm(Bvec)
+            if absB < absB_min:
+                absB_min = absB
+            elif not tried_reverse:
+                #reset with negative step
+                xi = xs
+                yi = ys
+                zi = zs
+                trace_ds = trace_ds * -1
+                tried_reverse = True
+                #print("reversing...")
+            else:
+                xe = xi
+                ye = yi
+                ze = zi
+                found_equator = True
+                break
+
+        if found_equator:
+            return xe, ye, ze
+        elif not found_equator and level < max_level:
+            return self.trace_field_to_equator(xs, ys, zs, ti, trace_ds = trace_ds / 2, level = level + 1)
+        elif not found_equator:
+            print("error: could not find the magnetic equator via field line tracing")
+            sys.exit()
 
 class Customfield_With_Perturbation(Dipolefield):
     def __init__(self, bgload, pertload, reversetime=-1):

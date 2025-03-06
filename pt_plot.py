@@ -652,20 +652,36 @@ maxn = -1
 # print("quitting...")
 # sys.exit()
 
-
+def print_invariants(ptids, resultfile):
+    fmt_str = "M={:.2f}; E={:.2f}MeV, K={:.2f}G^0.5RE, aeq={:.2f}d, L={:.2f}, phi_g={:.2f}, phi_b={:.2f}, phi_d={:.2f}"
+    for ptid in ptids:
+        checkcode = ptids[ptid]
+        print("", "{} check: {}".format(ptid, checkcode))
+        if checkcode == 1:
+            muenKalphaL0, muenKalphaL1 = resultfile.read_invariants(ptid)
+            muenKalphaL0[0] = muenKalphaL0[0] * pt_tools.constants.G2T / pt_tools.constants.MeV2J
+            muenKalphaL1[0] = muenKalphaL1[0] * pt_tools.constants.G2T / pt_tools.constants.MeV2J
+            muenKalphaL0[3] = muenKalphaL0[3] * 180 / np.pi
+            muenKalphaL1[3] = muenKalphaL1[3] * 180 / np.pi
+            if muenKalphaL0 is None:
+                print("", "", "initial invariants not stored")
+                print("", "", fmt_str.format(*muenKalphaL1))
+            if muenKalphaL1 is None:
+                print("", "", fmt_str.format(*muenKalphaL0))
+                print("", "", "final invariants not stored")
+            else:
+                print("", "", fmt_str.format(*muenKalphaL0))
+                print("", "", fmt_str.format(*muenKalphaL1))
+        else:
+            print("", "", "invariants not stored")
 print("Plotting changes to invariants...")
 axlims = plot_invariants(resultfile, ptids, tracklist, filename=os.path.join(dirname,"{}_Figure_adiabatics.png".format(plotname)),
     maxn=maxn,
     axlims = [],
-    )#axes_invariants_idx = [7,4,1])
-#flc:
-#axlims = plot_invariants(filename="Figure_adiabatics_{}.png".format(plotname), maxn=maxn,
-#    axlims = [], axes_invariants_idx = [1, 2, 3])
+    )
+print_invariants(ptids, resultfile)
 print(axlims)
 print()
-print("quitting...")
-
-
 
 print("Printing 2D overview looking down towards Earth...")
 axlims = plot_positions2D_birdseye(resultfile, ptids, tracklist, seeEarth = False, ring = -1, skipeveryn=5, filename=os.path.join(dirname,"{}_Figure_birdseye.png".format(plotname)),

@@ -77,7 +77,7 @@ def dYdt(t, Y, particle, bfield):
     v2 = Y[4] / (gamma * particle.m0)
     v3 = Y[5] / (gamma * particle.m0)
     
-    B1, B2, B3, E1, E2, E3 = bfield.getBE(x1, x2, x3, t) #B in the observer frame
+    B1, B2, B3, E1, E2, E3 = bfield.getBE(x1, x2, x3, t)
 
     #Calculate the Lorentz force in the observer frame:
     F1 = particle.q * (v2*B3 - v3*B2) + particle.q * E1
