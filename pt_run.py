@@ -299,10 +299,10 @@ for pt_id in tracklist_ID:
     if mu != mu:  # NaN value for when we are overriding the mu axis with some specific energy
         #use energy to calculate mu:
         # get initial position of the GC based on particle L:
-        x0_GC = particle.calculate_initial_GC()
+        x0_GC_MAG = bfield.calculate_initial_GC(particle.init_L, particle.iphase_drift)
         # get a possible initial momentum vector on the magnetic equator,
         #   multiple solutions because adiabatic invariants say nothing about phase:
-        B_GC = np.linalg.norm(bfield.getBE(*x0_GC, 0)[:3])
+        B_GC = np.linalg.norm(bfield.getBE(*x0_GC_MAG, 0)[:3])
         E0_J = tracklist_energy[pt_id] * pt_tools.constants.MeV2J
         gamma = 1 + E0_J/ (particle.m0 * (pt_tools.constants.c ** 2))
         p0mag = (particle.m0 * pt_tools.constants.c) * np.sqrt(gamma**2 - 1)
@@ -328,8 +328,8 @@ for pt_id in tracklist_ID:
 
         if checkcodes[pt_id] == 1: #if the track has been successfully calculated
             #calculate initial momentum and relativistic mass:
-            x0_GC = particle.calculate_initial_GC()
-            B_GC = np.linalg.norm(bfield.getBE(*x0_GC, 0)[:3])
+            x0_GC_MAG = bfield.calculate_initial_GC(particle.init_L, particle.iphase_drift)
+            B_GC = np.linalg.norm(bfield.getBE(*x0_GC_MAG, 0)[:3])
             p0 = particle.calculate_initial_momentum(B_GC)
             gamma = np.sqrt(1 + (np.linalg.norm(p0)/(particle.m0 * pt_tools.constants.c))**2)
             massr = particle.m0#gamma*particle.m0

@@ -24,6 +24,11 @@ class constants:
     charge_proton = 1.602176620898e-19
     charge_electron = -1* charge_proton
 
+def moving_average(a, n) :
+    ret = np.cumsum(a, dtype=float, axis = 0)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
+
 class HDF5_pt:
     def __init__(self, filepath, existing = False):
         """create a HDF5 file"""
@@ -429,12 +434,6 @@ def coord_car_rz(x, y, z, dphi):
     """
     return (cos(dphi) * x - sin(dphi) * y, sin(dphi) * x + cos(dphi) * y, z)
 
-def coord_car_get_anticlockwise_angle(x1):
-    """
-    get anticlockwise angle of x1 around z axis from [1, 0]
-    """
-    return (np.angle(x1[0] + x1[1] * 1j, deg=True) + 360) % 360
-
 class Proton_trace:
     def __init__(self, mu, alpha, L, iphase_gyro=0, iphase_bounce=0, iphase_drift=0, storetrack = True):
         #proton properties:
@@ -548,16 +547,6 @@ class Proton_trace:
         else:
             return 0
 
-    def calculate_initial_GC(self):
-        #get initial position of the GC based on particle L:
-        R_gc_RE = self.init_L
-        R_gc = R_gc_RE * constants.RE
-
-        xgc, ygc, zgc = coord_car_rz(R_gc, 0, 0, np.radians(self.iphase_drift))
-
-        x0_GC = np.array([xgc, ygc, zgc])
-        return x0_GC
-
     def calculate_initial_momentum(self, B_GC):
         """
         calculates a possible momentum vector on the equator given:
@@ -592,27 +581,25 @@ class Proton_trace:
         v0x, v0y, v0z = coord_car_rz(v0x, v0y, v0z, np.radians(self.iphase_drift))
         v0 = np.array([v0x, v0y, v0z])
         p0 = massr * v0
-        #E0_J = self.calculateKE(bfield) #it is useful to have a separate funciton, so we can calculate energy from different scripts
         return p0
         
-    def calculate_initial_position(self, x0_GC, rg):
-        x0 = [rg, 0, 0] #0 degrees
+    def calculate_initial_position(self, x0_GC_MAG, rg):
+        step = [rg, 0, 0] #0 degrees
 
         #rotate the vector to the correct gyrophase:
-        x0r = coord_car_rz(x0[0], x0[1], x0[2], np.radians(self.iphase_gyro))
-        x0 = x0r
+        stepr = coord_car_rz(step[0], step[1], step[2], np.radians(self.iphase_gyro))
 
         #rotate the vector to the correct drift phase:
-        x0r= coord_car_rz(x0[0], x0[1], x0[2], np.radians(self.iphase_drift))
-        x0 = x0r
+        steprr= coord_car_rz(stepr[0], stepr[1], stepr[2], np.radians(self.iphase_drift))
 
-        x0 = x0 + x0_GC
+        x0 = steprr + x0_GC_MAG
 
         return x0
 
     def derive_KE0(self, bfield, t):
-        x0_GC = self.calculate_initial_GC()
-        B_GC = bfield.getBE(*x0_GC, t)[:3]
+        x0_GC_MAG = bfield.calculate_initial_GC(self.init_L, self.iphase_drift)
+
+        B_GC = bfield.getBE(*x0_GC_MAG, t)[:3] #vector is invariant to changes in reference frame, i.e. same in MAG
 
         p0 = self.calculate_initial_momentum(B_GC)
         p0mag = np.linalg.norm(p0)

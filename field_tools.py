@@ -19,14 +19,86 @@ import sys
 from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
 
 
+def get_rotation_GEO_to_MAG(year_dec):
+    """
+    year_dec : date as a decimal of year, i.e. 2015.25
+
+    returns rotation matrix from GEO to MAG frame
+
+    from the Spenvis help page (https://www.spenvis.oma.be/help/background/coortran/coortran.html),
+    the equation to solve is:
+        T_5 = <phi - 90d, Y> * <lambda, Z>
+
+    <lambda, Z> is a rotation in the plane of the Earth's equator form the Greenwich meridian to the meridian containing the dipole pole
+    <phi - 90d, Y> is a rotation in that meridian from the geographic pole to the dipole pole
+    """
+    g, h = IGRF_tools.arrange_IGRF_coeffs(year_dec)
+    #B0_2 = g[1][0] ** 2 + g[1][1] ** 2 + h[1][1] ** 2
+
+    lmbda = atan(h[1][1]/g[1][1])
+    phi = np.pi/2 - atan((g[1][1]*cos(lmbda) + h[1][1]*sin(lmbda)) / g[1][0])
+
+    R_mer = np.array([[cos(lmbda), -1*sin(lmbda), 0],[sin(lmbda), cos(lmbda), 0], [0,0,1]])
+    R_pole = np.array([[cos(phi-np.pi/2), 0, sin(phi-np.pi/2)],
+                       [0, 1, 0],
+                       [-1 * sin(phi-np.pi/2), 0, cos(phi-np.pi/2)]])
+    T5 = R_pole @ (R_mer @ np.identity(3)).T
+    return T5
+
+    ###validation using IRBEM for year_dec = 2015.0:
+    # import datetime
+    # from datetime import timezone
+    # import IRBEM as ib
+    # t_datetime = datetime.datetime(year=2015, month=1, day=1, tzinfo=timezone.utc)
+    # coords = ib.Coords()
+    # rot_GEO_to_MAG = coords.transform([t_datetime, t_datetime, t_datetime], [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 'GEO', 'MAG').T
+    # print(rot_GEO_to_MAG)
+
+def get_eccentric_centre_GEO(year_dec):
+    """return vector from origin to eccentric dipole centre in GEO frame [m] """
+    g, h = IGRF_tools.arrange_IGRF_coeffs(year_dec)
+
+    B0_2 = g[1][0] ** 2 + g[1][1] ** 2 + h[1][1] ** 2
+    B0_nT = sqrt(B0_2)
+    #B0_ = B0_ * constants.nT2T
+
+    L0 = 2*g[1][0]*g[2][0] + sqrt(3)*(g[1][1]*g[2][1] + h[1][1]*h[2][1])
+    L1 = -g[1][1]*g[2][0] + sqrt(3)*(g[1][0]*g[2][1] + g[1][1]*g[2][2] + h[1][1]*h[2][2])
+    L2 = -h[1][1]*g[2][0] + sqrt(3)*(g[1][0]*h[2][1] - h[1][1]*g[2][2] + g[1][1]*h[2][2])
+    E = (L0 * g[1][0] + L1*g[1][1] + L2*h[1][1]) / (4*((B0_nT)**2))
+    xi =  (L0 - g[1][0]*E)/(3*((B0_nT)**2))
+    eta = (L1 - g[1][1]*E)/(3*((B0_nT)**2))
+    zeta =(L2 - h[1][1]*E)/(3*((B0_nT)**2))
+
+    # print(L0)
+    # print(L1)
+    # print(L2)
+    # print(E)
+    # print(eta)
+    # print(zeta)
+    # print(xi)
+    #validated against Spenvis values for IGRF2000: https://www.spenvis.oma.be/help/background/magfield/cd.html
+    return constants.RE * np.array([eta, zeta, xi]) #meters
+
+def get_eccentric_centre_MAG(year_dec):
+    x_ed_GEO = get_eccentric_centre_GEO(year_dec)
+    #MAG frame is rotated from GEO:
+    M_GEO_to_MAG = get_rotation_GEO_to_MAG(year_dec)
+    x_ed_MAG = M_GEO_to_MAG @ x_ed_GEO
+    return x_ed_MAG
+
 class Dipolefield:
+    """
+    this class describes an eccentric, tilted dipole
+    an eccentric, tilted dipole is offset from the MAG frame, so we must translate the input coordinates of some functions that use dipole equations
+    """
     def __init__(self, year_dec):
         self.year_dec = year_dec
         self.B0, self.M = self.get_B0_m(year_dec)
         self.field_time = [0]
+        self.origin_MAG = get_eccentric_centre_MAG(year_dec)
 
     def get_dipolelc(self, Lb, atm_height):
-        Ba = (self.B0) * (4 - 3 / Lb) ** (0.5)
         RE = constants.RE
         ra = (RE + atm_height) / RE  # ~Earth's surface + atm_height_dipolelc m
 
@@ -37,10 +109,14 @@ class Dipolefield:
             dipole_lc = asin(sqrt((self.B0 / Lb ** 3) / Ba)) * 180 / pi
             return dipole_lc
 
-    def getBE(self, xh, yh, zh, t=0):
+    def getB_dipole(self, xh_MAG, yh_MAG, zh_MAG):
         """
         input: coordinates in m
         """
+        xh = xh_MAG - self.origin_MAG[0]
+        yh = yh_MAG - self.origin_MAG[1]
+        zh = zh_MAG - self.origin_MAG[2]
+
         Mdir_x = 0
         Mdir_y = 0
         Mdir_z = -1
@@ -52,14 +128,24 @@ class Dipolefield:
         by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
         bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
 
+        return bx, by, bz
+
+    def getBE(self, xh_MAG, yh_MAG, zh_MAG, t=0):
+        """
+        input: coordinates in m
+        """
+        bx, by, bz = self.getB_dipole(xh_MAG, yh_MAG, zh_MAG)
         return bx, by, bz, 0, 0, 0
 
-    def get_L(self, r, mag_lat):
+    def get_L(self, x1_MAG):
         """
         takes distance r (Earth radii) and magnetic latitude (radians)
         returns dipole L
         """
-        return r / (cos(mag_lat) ** 2)
+        x1 = x1_MAG - self.origin_MAG
+        r_ = np.linalg.norm(x1) / constants.RE
+        mag_lat = atan2(x1[2], sqrt(x1[0] ** 2 + x1[1] ** 2))
+        return r_ / (cos(mag_lat) ** 2)
 
     def get_B0_m(self, year):
         """Get the average dipole field strength around Earth's equator and dipole moment. Use like so: B0,m = get_B0_m(2000.0)"""
@@ -72,6 +158,27 @@ class Dipolefield:
 
         return B0_, M_
 
+    def find_magequator_z(self, xs, ys, zs, ti):
+        #return z component of offset, eccentric dipole offset vector in the MAG frame
+        return self.origin_MAG[2]
+
+    def get_aclockw_angle_around_dipole_z(self, x1_MAG):
+        """
+        get anticlockwise angle of x1 around z axis from [1, 0]
+        """
+        x1 = x1_MAG - self.origin_MAG
+        return (np.angle(x1[0] + x1[1] * 1j, deg=True) + 360) % 360
+
+    def calculate_initial_GC(self, init_L, iphase_drift):
+        # get initial position of the GC in the MAG frame
+        R_gc_RE = init_L
+        R_gc = R_gc_RE * constants.RE
+
+        xgc, ygc, zgc = coord_car_rz(R_gc, 0, 0, np.radians(iphase_drift))
+
+        x0_GC = np.array([xgc, ygc, zgc])
+        x0_GC_MAG = x0_GC + self.origin_MAG
+        return x0_GC_MAG
 
 class Dipolefield_With_Perturbation(Dipolefield):
     def __init__(self, fileload, reversetime=-1):
@@ -209,43 +316,25 @@ class Dipolefield_With_Perturbation(Dipolefield):
 
         return interp_vals
 
-    def getB_dipole(self, xh, yh, zh):
+    def getBE(self, xh_MAG, yh_MAG, zh_MAG, t=0):
         """
         input: coordinates in m
         """
-        Mdir_x = 0
-        Mdir_y = 0
-        Mdir_z = -1
+        bx, by, bz = self.getB_dipole(xh_MAG, yh_MAG, zh_MAG)
 
-        r = sqrt(pow(xh, 2) + pow(yh, 2) + pow(zh, 2))
-        C1 = 1e-7 * self.M / (r ** 3)
-        mr = Mdir_x * xh + Mdir_y * yh + Mdir_z * zh
-        bx = C1 * (3 * xh * mr / (r ** 2) - Mdir_x)
-        by = C1 * (3 * yh * mr / (r ** 2) - Mdir_y)
-        bz = C1 * (3 * zh * mr / (r ** 2) - Mdir_z)
-
-        return bx, by, bz
-
-    def getBsph_dipole(self, rh, thetah, t=0):
-        """
-        input: coordinates r [m], theta
-        """
-
-        br = -2 * self.B0 * ((self.RE / rh) ** 3) * cos(thetah)
-        btheta = -self.B0 * ((self.RE / rh) ** 3) * sin(thetah)
-
-        return br, btheta
-
-    def getBE(self, xh, yh, zh, t=0):
-        """
-        input: coordinates in m
-        """
-        bx, by, bz = self.getB_dipole(xh, yh, zh)
-
-        bwx0, bwy0, bwz0, qEx, qEy, qEz = self.int_field(xh, yh, zh, t)
+        bwx0, bwy0, bwz0, qEx, qEy, qEz = self.int_field(xh_MAG, yh_MAG, zh_MAG, t)
 
         return bx + bwx0, by + bwy0, bz + bwz0, qEx, qEy, qEz
 
+    # def getBsph_dipole(self, rh, thetah, t=0):
+    #     """
+    #     input: coordinates r [m], theta
+    #     """
+    #
+    #     br = -2 * self.B0 * ((self.RE / rh) ** 3) * cos(thetah)
+    #     btheta = -self.B0 * ((self.RE / rh) ** 3) * sin(thetah)
+    #
+    #     return br, btheta
 
 class Customfield(Dipolefield):
     def __init__(self, fileload, reversetime=-1):
@@ -258,6 +347,7 @@ class Customfield(Dipolefield):
         t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
         year_dec = dt_to_dec(t0)
         super().__init__(year_dec)  # defines B0, M
+        #self.origin_MAG = np.array([0, 0, 0])
         self.t0 = t0
 
         self.field_time = disk.read_dataset(disk.group_name_data, "time")
@@ -369,14 +459,17 @@ class Customfield(Dipolefield):
 
         return interp_vals
 
-    def getBE(self, xh, yh, zh, t=0):
+    def getBE(self, xh_MAG, yh_MAG, zh_MAG, t=0):
         """
         input: coordinates in m
         """
-        bx, by, bz = self.int_field(xh, yh, zh, t)
+        bx, by, bz = self.int_field(xh_MAG, yh_MAG, zh_MAG, t)
         return bx, by, bz, 0, 0, 0
 
-    def trace_field_to_equator(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE, level=0):
+    def find_magequator(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE, level=0, direction=1):
+        """
+        xs, ys, zs is the starting point of the trace
+        """
         max_level = 5
         max_R = 10 * sqrt(xs ** 2 + ys ** 2 + zs ** 2)
         xi = xs
@@ -389,22 +482,23 @@ class Customfield(Dipolefield):
         absB = np.linalg.norm(Bvec)
         absB_min = absB
         while sqrt(xi ** 2 + yi ** 2 + zi ** 2) < max_R:
-            xi += trace_ds * Bvec[0] / absB
-            yi += trace_ds * Bvec[1] / absB
-            zi += trace_ds * Bvec[2] / absB
+            xi += direction * trace_ds * Bvec[0] / absB
+            yi += direction * trace_ds * Bvec[1] / absB
+            zi += direction * trace_ds * Bvec[2] / absB
 
             Bvec = self.int_field(xi, yi, zi, ti)
             absB = np.linalg.norm(Bvec)
             if absB < absB_min:
                 absB_min = absB
+                tried_reverse = True #no need to try reversing if we are finding that field strength decreases in this direction
             elif not tried_reverse:
                 # reset with negative step
                 xi = xs
                 yi = ys
                 zi = zs
-                trace_ds = trace_ds * -1
+                direction = direction * -1
                 tried_reverse = True
-                # print("reversing...")
+                print("reversing...")
             else:
                 xe = xi
                 ye = yi
@@ -415,10 +509,14 @@ class Customfield(Dipolefield):
         if found_equator:
             return xe, ye, ze
         elif not found_equator and level < max_level:
-            return self.trace_field_to_equator(xs, ys, zs, ti, trace_ds=trace_ds / 2, level=level + 1)
+            return self.find_magequator(xs, ys, zs, ti, trace_ds=trace_ds / 2, level=level + 1)
         elif not found_equator:
             print("error: could not find the magnetic equator via field line tracing")
             sys.exit()
+
+    def find_magequator_z(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE):
+        _, _, ze = self.find_magequator(xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE)
+        return ze
 
 
 class Customfield_With_Perturbation(Dipolefield):
@@ -475,6 +573,7 @@ class Epulse: #method of Li et al, 1993
 #     #ptsnew[:,4] = np.arctan2(xyz[:,2], np.sqrt(xy)) # for elevation angle defined from XY-plane up
 #     ptsnew[:,5] = np.arctan2(xyz[:,1], xyz[:,0])
 #     return ptsnew
+
 def coord_car2sph(x,y,z): #cartesian to spherical
     xy = x**2 + y**2
     r = sqrt(xy + z**2)

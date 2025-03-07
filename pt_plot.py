@@ -353,9 +353,6 @@ def plot_invariants(resultfile, ptids, tracklist, axes_invariants_idx = [4, 0, 7
         muenKalphaL1[0] = muenKalphaL1[0] * mu_conv
         muenKalphaL0[3] = muenKalphaL0[3] * 180/np.pi
         muenKalphaL1[3] = muenKalphaL1[3] * 180/np.pi
-        pg, pb, pd = tracklist[ptid][3:] #starting phases, for solutions produced before these were added to muenKalphaL0
-        muenKalphaL0[5:8] = pg, pb, pd
-
         if muenKalphaL1[2] < 0 and muenKalphaL1[0] > 0:
             # K = -1 but mu, etc., is valid when bounce orbits could not correctly be ID'd
             # however the particle may not have been 'lost'
@@ -379,6 +376,9 @@ def plot_invariants(resultfile, ptids, tracklist, axes_invariants_idx = [4, 0, 7
     xyc0 = np.array(xyc0)
     xyc1 = np.array(xyc1)
     # xyc0_lost = np.array(xyc0_lost)
+
+    print(xyc0[:,2])
+    print(xyc1[:,2])
 
     cmin = min([min(xyc0[:,2]), min(xyc1[:,2])])#, min(xyc0_lost[:,2])])
     cmax = max([max(xyc0[:,2]), max(xyc1[:,2])])#, max(xyc0_lost[:,2])])
@@ -653,7 +653,7 @@ maxn = -1
 # sys.exit()
 
 def print_invariants(ptids, resultfile):
-    fmt_str = "M={:.2f}; E={:.2f}MeV, K={:.2f}G^0.5RE, aeq={:.2f}d, L={:.2f}, phi_g={:.2f}, phi_b={:.2f}, phi_d={:.2f}"
+    fmt_str = "M={:.2f}; E={:.2f}MeV, K={:.2f}G^0.5RE, aeq={:.2f}d, L={:.2f}, phi_g={:.2f}, phi_b={:.2f}, phi_d={:.3f}"
     for ptid in ptids:
         checkcode = ptids[ptid]
         print("", "{} check: {}".format(ptid, checkcode))
