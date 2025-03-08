@@ -64,7 +64,7 @@ def interpolate_constant_dt(times, positions, dt_min=-1):
 
     return newtimes, newpositions, dt_min
 
-def plot_positions(resultfile, ptids, seeEarth=True, filename=None, limit=-1, view_ele = None, view_azi = None, maxn=-1):
+def plot_positions(resultfile, ptids, filename=None, limit=-1, view_ele = None, view_azi = None, maxn=-1):
     if maxn > 0:
         nplot = min(len(ptids), maxn)
     elif maxn == 0:
@@ -92,53 +92,6 @@ def plot_positions(resultfile, ptids, seeEarth=True, filename=None, limit=-1, vi
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     RE = pt_tools.constants.RE
-
-    if seeEarth:
-        from spacepy import coordinates as coord
-        from spacepy.time import Ticktock
-        import datetime
-        date= datetime.datetime(2015,1,1)
-
-        bfield = Dipolefield(date.year)
-        
-        x_ed_GEO_ = bfield.get_eccentric_centre_GEO()
-        #change them to the MAG frame:
-        x_ed_GEO = coord.Coords(x_ed_GEO_/RE, 'GEO', 'car')
-        x_ed_GEO.ticks = Ticktock(date, 'UTC')
-        x_ed_MAG = x_ed_GEO.convert('MAG', 'car')
-        #x_ed_MAG.ticks = Ticktock(epoch, 'UTC')
-        #
-        x_ed_GEO = RE * np.array([x_ed_GEO.x[0], x_ed_GEO.y[0], x_ed_GEO.z[0]])
-        x_ed_MAG = RE * np.array([x_ed_MAG.x[0], x_ed_MAG.y[0], x_ed_MAG.z[0]])
-
-        A = WGS84.M
-        A1 = A[:,0]
-        A2 = A[:,1]
-        A3 = A[:,2]
-        x_Earth_GEO = coord.Coords(np.array([A1,A2,A3]), 'GEO', 'car')
-        x_Earth_GEO.ticks = Ticktock(np.array([date]*3), 'UTC')
-        x_Earth_MAG = x_Earth_GEO.convert('MAG', 'car')
-        A = x_Earth_MAG.data
-
-        # rotate it
-        # https://math.stackexchange.com/questions/1403126/what-is-the-general-equation-equation-for-rotated-ellipsoid
-        ### find the rotation matrix and radii of the axes
-        U, s, rotation = linalg.svd(A)
-        radii = 1.0 / np.sqrt(s)
-
-        ue, ve = np.mgrid[0:2 * np.pi:24j, 0:np.pi:10j]
-
-
-        xe = radii[0] * np.cos(ue) * np.sin(ve) / constants.RE
-        ye = radii[1] * np.sin(ue) * np.sin(ve) / constants.RE
-        ze = radii[2] * np.cos(ve) / constants.RE
-
-
-        #add off-centre
-        xe += x_ed_MAG[0]/ constants.RE
-        ye += x_ed_MAG[1]/ constants.RE
-        ze += x_ed_MAG[2]/ constants.RE
-        ax.plot_wireframe(xe, ye, ze, color="deepskyblue", zorder=2)
 
     # draw particle trajectory:
     colours = colors(len(positionslist))
@@ -377,9 +330,6 @@ def plot_invariants(resultfile, ptids, tracklist, axes_invariants_idx = [4, 0, 7
     xyc1 = np.array(xyc1)
     # xyc0_lost = np.array(xyc0_lost)
 
-    print(xyc0[:,2])
-    print(xyc1[:,2])
-
     cmin = min([min(xyc0[:,2]), min(xyc1[:,2])])#, min(xyc0_lost[:,2])])
     cmax = max([max(xyc0[:,2]), max(xyc1[:,2])])#, max(xyc0_lost[:,2])])
     if axes_invariants_logspace[axes_invariants_idx[2]]:
@@ -534,67 +484,6 @@ def plot_positions_multiplefiles(resultfiles, ptids_collection, seeEarth=True, f
         plt.show()
     plt.close()
 
-# b='pt_solutions/GC_reanalysis_test_GC_fwd_solutions.h5'
-# #b_re_approx10 = 'pt_solutions/GC_reanalysis_test_fwd_solutions_GC.h5'
-# b_re_approx5 = 'pt_solutions/GC_reanalysis_test_fwd_solutions_GC_skip.h5'
-# resultfiles = [pt_tools.HDF5_pt(b, existing=True),
-#     #pt_tools.HDF5_pt(b_re_approx10, existing=True),
-#     pt_tools.HDF5_pt(b_re_approx5, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71,legend=True,limit=100000);sys.exit()
-# sys.exit()
-
-
-
-# b='pt_solutions/GC_reanalysis_test_solutions.h5'
-# #b_re='pt_solutions/GC_reanalysis_test_solutions_GC_preserved_momentum.h5'
-# b_re_approx10 = 'pt_solutions/GC_reanalysis_test_solutions_GC_10.h5'
-# b_re_approx5 = 'pt_solutions/GC_reanalysis_test_solutions_GC_5.h5'
-# resultfiles = [pt_tools.HDF5_pt(b, existing=True),
-#     #pt_tools.HDF5_pt(b_re, existing=True),
-#     pt_tools.HDF5_pt(b_re_approx10, existing=True),
-#     pt_tools.HDF5_pt(b_re_approx5, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71,legend=True,limit=100000);sys.exit()
-# sys.exit()
-
-# d='pt_solutions/GC_reanalysis_test_GC_solutions.h5'
-# d_re='pt_solutions/GC_reanalysis_test_solutions_GC.h5'
-# resultfiles = [pt_tools.HDF5_pt(d, existing=True), pt_tools.HDF5_pt(d_re, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71,legend=True);sys.exit()
-# sys.exit()
-# b='pt_solutions/GC_reanalysis_test_GC_fwd_solutions.h5'
-# b_re='pt_solutions/GC_reanalysis_test_fwd_solutions_GC.h5'
-# resultfiles = [pt_tools.HDF5_pt(b, existing=True), pt_tools.HDF5_pt(b_re, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71,legend=True);sys.exit()
-# sys.exit()
-
-# x='pt_solutions/GC_reanalysis_test_GC_fwd_solutions.h5'
-# y='pt_solutions/GC_reanalysis_test_GC_solutions.h5'
-# resultfiles = [pt_tools.HDF5_pt(x, existing=True), pt_tools.HDF5_pt(y, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71)
-# sys.exit()
-
-# c='pt_solutions/GC_reanalysis_test_solutions.h5'
-# d='pt_solutions/GC_reanalysis_test_GC_solutions.h5'
-# resultfiles = [pt_tools.HDF5_pt(c, existing=True), pt_tools.HDF5_pt(d, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# #plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71);sys.exit()
-# for ptid in ptids[-1]:
-#     _, GC1 = resultfiles[-1].read_track(ptid, verbose = False)
-# np.save('GC1.npy', GC1)
-# a='pt_solutions/GC_reanalysis_test_fwd_solutions.h5'
-# b='pt_solutions/GC_reanalysis_test_GC_fwd_solutions.h5'
-# resultfiles = [pt_tools.HDF5_pt(a, existing=True), pt_tools.HDF5_pt(b, existing=True)]
-# ptids = [resultfile.get_solved_ids() for resultfile in resultfiles]
-# #plot_positions_multiplefiles(resultfiles, ptids, seeEarth = False, view_ele = 0, view_azi = -71);sys.exit()
-# for ptid in ptids[-1]:
-#     _, GC2 = resultfiles[-1].read_track(ptid, verbose = False)
-# np.save('GC2.npy', GC2)
-# sys.exit()
 
 
 #set up parser and arguments: ------------------------------------------------+
@@ -646,11 +535,11 @@ tracklist = resultfile.get_existing_tracklist()
 plotname = os.path.basename(fileh5[:-3])
 maxn = -1
 
-# print("Printing 3D overview, click and drag to move around...")
-# plot_positions(resultfile, ptids, seeEarth = False, view_ele = 0, view_azi = -71)
-# print()
-# print("quitting...")
-# sys.exit()
+print("Printing 3D overview, click and drag to move around...")
+plot_positions(resultfile, ptids, view_ele = 0, view_azi = -71)
+print()
+print("quitting...")
+sys.exit()
 
 def print_invariants(ptids, resultfile):
     fmt_str = "M={:.2f}; E={:.2f}MeV, K={:.2f}G^0.5RE, aeq={:.2f}d, L={:.2f}, phi_g={:.2f}, phi_b={:.2f}, phi_d={:.3f}"

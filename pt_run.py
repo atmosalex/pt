@@ -84,6 +84,17 @@ elif particletype[0].lower() == "e":
     Particle = pt_tools.Electron_trace
 else:
     print("Error: particle species '{}' not recognised".format(particletype))
+    sys.exit()
+
+if iphase_gyro > 1 or iphase_gyro < 0:
+    print("Error: initial gyration phase has been specified incorrectly (please specify 0 <= x <= 1)")
+    sys.exit()
+if iphase_bounce > 1 or iphase_bounce < 0:
+    print("Error: initial bounce phase has been specified incorrectly (please specify 0 <= x <= 1)")
+    sys.exit()
+if iphase_drift > 1 or iphase_drift < 0:
+    print("Error: initial drift phase has been specified incorrectly (please specify 0 <= x <= 1)")
+    sys.exit()
 
 if orbittype[0].lower() == "b":
     print("Bounce mode")
@@ -98,6 +109,7 @@ elif orbittype[0].lower() == "t":
     call_to_solver = pt_fp.solve_trajectory_time
 else:
     print("Error: orbit type '{}' not recognised".format(orbittype))
+    sys.exit()
 
 if storetrack[0].lower() == "y" or storetrack[0].lower() == "t":
     storetrack = True

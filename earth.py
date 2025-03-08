@@ -23,8 +23,9 @@ class Earth:
         #rotate the WGS84 ellipsoid from GEO to MAG:
         self.M_MAG = np.matmul(field_tools.get_rotation_GEO_to_MAG(year_dec), M_GEO)
         # this is Earth's surface in the MAG frame
+        self.c_MAG = np.zeros(3)
 
-    def intersection_line_ellipsoid(Q, o, l, c):
+    def solve_lambda_intersection(self, o, l):
         """
         calculates lambda for an intersecting line, ellipsoid given by:
             x = o + lambda * l,
@@ -37,9 +38,10 @@ class Earth:
             Q is the ellipsoid matrix.
 
         all parameters must be defined in the same coordinate system
-
         only real values are returned as we are dealing with physical space
         """
+        Q = self.M_MAG
+        c = self.c_MAG
         v = (o - c)
 
         # quadratic equation in terms of lambda with the following coefficients:
@@ -62,39 +64,83 @@ class Earth:
         c = np.matmul(v, c)
 
         p = [a, b, c - 1]
-
         # disc = b**2 - 4 * a * c
 
         sols = np.roots(p)
         return sols[np.isreal(sols)]
 
-    def shoot_Earth(self, p0, p1):
-        # negative tangent to trajectory:
-        l = - (p1 - p0)  # s.t. p1 + l = p0
-        l = l / np.linalg.norm(l)
+    def get_height_above_surface(self, px):
+        #check if px is above the surface:
+        lmbda_max = -1 * np.inf
+        sol = self.solve_lambda_intersection(px, px / np.linalg.norm(px)) #from origin in direction of p0 unit vector
+        for lmbda in sol:
+            if lmbda > 0:
+                return None #px is below the surface
+            else: #lmbda <= 0:
+                if lmbda > lmbda_max:
+                    lmbda_max = lmbda
+        return -1 * lmbda_max
 
-        # check the particle is above the surface of the atmosphere at 100km:
-        tospace = self.intersection_line_ellipsoid(self.ellipsoid_M_MAG, self.ellipsoid_centre_MAG + p0, p0 / np.linalg.norm(p0), ellipsoid_centre_MAG)
-        if len(tospace):  # take the smallest POSITIVE root (collision with closest face in the direction of Earth)
-            for solution in tospace:
-                if solution > 0:
-                    belowsurface = True
-                    print("error 1"); sys.exit()
+    # def land(self, p0, p1):
+    #     """
+    #     calculate the intersection point pX between p0 and p1 at Earth's surface, if there is one
+    #     warning: this function assumes that p0 is above Earth's surface!
+    #
+    #      .p0
+    #       \
+    #        \
+    #     ____x___ Earth
+    #          \
+    #           \
+    #            .p1
+    #     """
+    #     # check if p1 is below the surface:
+    #     sol = self.solve_lambda_intersection(p1, p1 / np.linalg.norm(p1))  # from origin in direction of p0 unit vector
+    #     for lmbda in sol:
+    #         if lmbda > 0:
+    #             p1_below_surface = True
+    #             break
+    #
+    #     if not p1_below_surface:
+    #         pX = None  # miss
+    #     else:
+    #         # tangent to particle trajectory:
+    #         l = (p1 - p0)
+    #         l = l / np.linalg.norm(l)
+    #
+    #         # calculate the intersection point between the tangent and ellipsoid:
+    #         # if p0 is above the surface, and p1 at or below the surface, there are one or two positive solutions for lambda
+    #         # one solution in the case that p1 is at the surface and l direction skims the surface without passing through
+    #         sol = self.solve_lambda_intersection(p0, l)
+    #         pX = p0 + np.min(sol) * l
+    #     return pX
+    def land(self, p0, p1):
+        """
+        calculate the intersection point pX between p0 and p1 at Earth's surface, if there is one
+        warning: this function assumes that p0 is above Earth's surface!
 
-        # calculate the intersection point (if any) between the negative tangent and ellipsoid:
-        # intersection_line_ellipsoid(...) returns the parameter lambda, distance along a vector with unit l until collision
-        lam = self.intersection_line_ellipsoid(self.ellipsoid_M_MAG, p0, l, self.ellipsoid_centre_MAG)
-        positive_solutions = []
-        if len(lam):  # take the smallest POSITIVE root (collision with closest face IN THE DIRECTION OF EARTH, NOT AWAY)
-            for solution in lam:
-                if solution > 0:
-                    positive_solutions.append(solution)
-        else:  # no intersection
-            print("error 2"); sys.exit()
-        if len(positive_solutions):
-            lam = min(positive_solutions)
-        else:  # no intersection in the correct direction
-            print("error 3"); sys.exit()
+         .p0
+          \
+           \
+        ____x___ Earth
+             \
+              \
+               .p1
+        """
 
-        atm_hit_point = p0 + lam * l  # mag coordinates
-        atm_hit_point_GEO = np.matmul(R_mag_to_GEO, atm_hit_point)
+        #tangent to particle trajectory:
+        l = (p1 - p0)
+        lmag = np.linalg.norm(l)
+        lnorm = l / np.linalg.norm(l)
+
+        #calculate the intersection point of the tangent and ellipsoid:
+        # if p0 is above the surface, and p1 at or below the surface, there are one or two positive solutions for lambda
+        # one solution in the case that p1 is at the surface and l direction skims the surface without passing through
+        pX = None
+        sol = self.solve_lambda_intersection(p0, lnorm)
+        if len(sol):
+            sol_nearest = min(sol)
+            if sol_nearest > 0 and sol_nearest < lmag:
+                #must be positive aiming from p0 to p1, must be smaller than lmag to be between p0 and p1
+                pX = p0 + sol_nearest * l
+        return pX

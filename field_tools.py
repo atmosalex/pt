@@ -6,6 +6,11 @@ import IGRF_tools
 from datetime import datetime, timezone
 from pt_tools import constants, dt_to_dec
 
+# we work in the MAG frame because:
+#  we can transform between GEO and MAG using only three IGRF parameters (no IRBEM dependence, etc.)
+#  the convenient transformation between MAG and GEO allows us to include models of Earth's surface
+#  the transformation between the MAG frame and an offset, eccentric dipole frame is a simple translation, to which vectors are invariant
+
 verbose = True
 def v_print(*a, **b):
     """Thread safe print function"""
@@ -43,7 +48,7 @@ def get_rotation_GEO_to_MAG(year_dec):
                        [0, 1, 0],
                        [-1 * sin(phi-np.pi/2), 0, cos(phi-np.pi/2)]])
     T5 = R_pole @ (R_mer @ np.identity(3)).T
-    return T5
+    return T5 #validated using IRBEM
 
     ###validation using IRBEM for year_dec = 2015.0:
     # import datetime
@@ -97,6 +102,7 @@ class Dipolefield:
         self.B0, self.M = self.get_B0_m(year_dec)
         self.field_time = [0]
         self.origin_MAG = get_eccentric_centre_MAG(year_dec)
+        self.B_grid = False
 
     def get_dipolelc(self, Lb, atm_height):
         RE = constants.RE
@@ -170,7 +176,9 @@ class Dipolefield:
         return (np.angle(x1[0] + x1[1] * 1j, deg=True) + 360) % 360
 
     def calculate_initial_GC(self, init_L, iphase_drift):
-        # get initial position of the GC in the MAG frame
+        """
+        get initial position of the GC in the MAG frame
+        """
         R_gc_RE = init_L
         R_gc = R_gc_RE * constants.RE
 
@@ -178,6 +186,8 @@ class Dipolefield:
 
         x0_GC = np.array([xgc, ygc, zgc])
         x0_GC_MAG = x0_GC + self.origin_MAG
+        #what should be done here in the case of an arbitrary field?
+        # the particle GC should be at the point of minimum B because we can prescribe equatorial pitch angle here
         return x0_GC_MAG
 
 class Dipolefield_With_Perturbation(Dipolefield):
@@ -347,6 +357,7 @@ class Customfield(Dipolefield):
         t0 = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
         year_dec = dt_to_dec(t0)
         super().__init__(year_dec)  # defines B0, M
+        self.B_grid = True
         #self.origin_MAG = np.array([0, 0, 0])
         self.t0 = t0
 
@@ -412,6 +423,9 @@ class Customfield(Dipolefield):
         if pze0 < 0:
             self.range_adequate = False
             return [0, 0, 0, 0, 0, 0]
+        if pte0 < 0:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
         if pxe0 > len(self.field_x) - 2:
             self.range_adequate = False
             return [0, 0, 0, 0, 0, 0]
@@ -419,6 +433,9 @@ class Customfield(Dipolefield):
             self.range_adequate = False
             return [0, 0, 0, 0, 0, 0]
         if pze0 > len(self.field_z) - 2:
+            self.range_adequate = False
+            return [0, 0, 0, 0, 0, 0]
+        if pte0 > len(self.field_time) - 2:
             self.range_adequate = False
             return [0, 0, 0, 0, 0, 0]
 
@@ -498,7 +515,7 @@ class Customfield(Dipolefield):
                 zi = zs
                 direction = direction * -1
                 tried_reverse = True
-                print("reversing...")
+                #print("reversing...")
             else:
                 xe = xi
                 ye = yi
@@ -683,11 +700,10 @@ def solvefield_pulse(pulse, fpath_sol, t0_ts, dur, resolution):
     print("E0 = ", pulse.E0, "V/m")
     #solution storage on disk:
     file_exists = exists(fpath_sol)
-    disk = field_h5.HDF5_field(fpath_sol, existing = file_exists, delete = False)
+    disk = field_h5.HDF5_field(fpath_sol, existing = file_exists, delete = True)
     disk.add_dataset(disk.group_name_data, "t0", t0_ts)
 
     #solve time evolution:
-    #bfield = dipolefield(constants.RE, 2015)
     for t in range(0, nt):
         tn = time[t]
         #t_datetime = datetime.datetime.utcfromtimestamp(tn + t0_ts)
@@ -787,7 +803,7 @@ def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
         print("field is already solved, exiting...")
         sys.exit(1)
 
-    resolution = (100, 100, 100, 2)
+    resolution = (201, 201, 201, 2)
 
     #mf_MAG_cdip = ib.MagFields(options=[0,0,0,0,5], verbose=False, kext='None', sysaxes=6, alpha=[90])
     mf_MAG_offdip = ib.MagFields(options=[0,0,0,0,1], verbose=False, kext='None', sysaxes=6, alpha=[90])
@@ -799,10 +815,11 @@ def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
     # coordinate resolution:
     nx, ny, nz, nt = resolution
     # coordinate axes:
-    xlim = 8
+    xlim = 6
     x = np.linspace(-xlim, xlim, nx)
     y = np.linspace(-xlim, xlim, ny)
     z = np.linspace(-xlim, xlim, nz)
+
     time = np.linspace(0, dur, nt)
 
     # coordinate grids:
@@ -820,7 +837,7 @@ def produce_dipolefield_for_validation_of_customfield(dur=10000, redo = True):
     print("memory/storeage required for field (mb) > 3 x {:.2f}mb".format(sol_Bx.nbytes / 1024 / 1024))
 
     # solution storage on disk:
-    disk = field_h5.HDF5_field(output, existing=file_exists, delete=False)
+    disk = field_h5.HDF5_field(output, existing=file_exists, delete=True)
     disk.add_dataset(disk.group_name_data, "t0", t0_ts)
     # solve time evolution:
     # bfield = dipolefield(constants.RE, 2015)

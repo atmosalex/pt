@@ -555,8 +555,8 @@ class Proton_trace:
         """
         #bz is positive (+z direction)
 
-        R_gc_RE = self.init_L
-        R_gc = R_gc_RE * constants.RE
+        #R_gc_RE = self.init_L
+        #R_gc = R_gc_RE * constants.RE
 
         p0_perp = sqrt(self.init_mu*2*self.m0*np.linalg.norm(B_GC))
         p0_par = 1./tan(self.init_alpha) * p0_perp

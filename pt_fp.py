@@ -4,7 +4,7 @@ from scipy.integrate import ode
 from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi
 from datetime import datetime
 import argparse
-
+import earth
 import pt_pushers
 import pt_tools
 import time
@@ -15,6 +15,7 @@ G2T = pt_tools.constants.G2T
 c = pt_tools.constants.c  # 299792458
 RE = pt_tools.constants.RE  # 6.3712e6
 
+warned_grid_resolution = False
 # critical settings:------------------------------------------------+
 aeq_max_for_bounce_detection = 89.5
 # above this threshold, particles will be considered equatorial,
@@ -87,7 +88,6 @@ def dYdt(t, Y, particle, bfield):
 
     return np.array([v1, v2, v3, F1, F2, F3]) #[0.0, -87183091.06369066, 103900761.98862153, -1.2361325231523902e-16, 0.0, 0.0]
 
-
 def angle_between(v1, v2):
     #from https://stackoverflow.com/questions/2827393/angles-between-two-n-dimensional-vectors-in-python
     """ Returns the angle in radians between vectors 'v1' and 'v2'::
@@ -102,7 +102,6 @@ def angle_between(v1, v2):
     v1_u = v1 / np.linalg.norm(v1)
     v2_u = v2 / np.linalg.norm(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
-
 
 def calc_rg(Y0, bfield, particle, t=0):
     """
@@ -123,7 +122,7 @@ def calc_rg(Y0, bfield, particle, t=0):
 
     return abs(gamma*particle.m0*(v2)/F1)
 
-def get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = -1, freezefield = -1): #freezefield not implemented yet
+def get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = -1, freezefield = -1, get_K=True): #freezefield not implemented yet
     """get the moving average gyrocentre position over each gyration"""
 
     def get_field_time_freeze(time):
@@ -185,6 +184,8 @@ def get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = -1, freezefiel
     track_gyrocentre = pt_tools.moving_average(track_gyrocentre, tsperorbit)
     track_gyrocentre_time = pt_tools.moving_average(track_gyrocentre_time, tsperorbit)
 
+    if not get_K:
+        return list(track_gyrocentre_time), list(track_gyrocentre), -1, -1
 
     #find visits to the peak magnetic field along the gyrocentre:
     Bmax = 0
@@ -227,8 +228,9 @@ def get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = -1, freezefiel
     # sys.exit()
 
     if len(idx_Bmax_peaks) <= 3:
-        print("Error: could not detect a whole bounce orbit")
-        print("","if using an interpolated B field and aeq~90, this is likely because the field is fuzzy at the scale of the particle's motion along Z, try decreasing aeq")
+        print("Error: could not detect a whole bounce orbit to calculate K")
+        print("","if using an interpolated B field and aeq~90, this could be because the field is fuzzy at the scale of the particle's motion along Z, try decreasing aeq")
+        print("","if using a field with longitudinal asymmetry, this could be because the estimate for tb became invalid as the particle drifted, and not enough trajectory was calculated")
         return list(track_gyrocentre_time), list(track_gyrocentre), -1, -1
 
     #isolate one GC bounce:
@@ -258,58 +260,47 @@ def get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = -1, freezefiel
     #return as much of the GC as possible, and K:
     return list(track_gyrocentre_time), list(track_gyrocentre), K, tb_est
 
-
-def get_bouncecapped_trajectory(bfield, tocap_time, tocap_pt, tsperorbit, idx_newbounce_start = 0, reverse=False):
+def get_bouncecapped_trajectory_dipole(bfield, tocap_time, tocap_pt, tsperorbit, idx_left_equator_safe = 0, reverse=False):
     """
     cap the trajectory to the soonest equatorial crossing at 0 bounce phase (negative to positive dZ relative to the magnetic equator)
-    if pt begins at dZ=0 and idx_newbounce_start = 0, this function will return the first point in the trajectory
+    if pt begins at dZ=0 and idx_left_equator_safe = 0, this function will return the first point in the trajectory
+     therefore set idx_left_equator_safe to a value s.t. the particle will not trip a bounce detection near the very beginning of its trajectory
     input must be numpy arrays
     returns floats, lists
+
+    works only when the magnetic equator is at constant z around the drift orbit (as in the case of a dipole aligned with MAG)
     """
 
-    # #if we can assume multiple gyrations per bounce, then we only need to check if the magnetic equator has been crossed once per gyration
-    # check_t = tocap_time[idx_newbounce_start:][::tsperorbit]
-    # check_Z = tocap_pt[idx_newbounce_start:][::tsperorbit]
-    # gyration_counter = 0
-    # for ti, pt in zip(check_t, check_Z):
-    #     zeq = bfield.find_magequator_z(pt[0], pt[1], pt[2], ti)
-    #     dz = pt[2] - zeq
-    #     idx_actual = idx_newbounce_start + gyration_counter * tsperorbit
-    #     gyration_counter = gyration_counter + 1
-    # #intpolate dz between these points:
-    #
-    tocap_pt_mageqator = np.zeros(tocap_pt.shape[0]) + bfield.origin_MAG[2]
-
     # find where Z goes from negative to positive, this is where bounce phase gets reset:
-    dz = tocap_pt[:, 2] - tocap_pt_mageqator
+    dz = tocap_pt[:, 2] - bfield.origin_MAG[2]
     dz_sign = np.sign(dz)
     # ... or if reverse tracing, find where Z goes from positive to negative:
     if reverse:
         dz_sign = -1 * dz_sign
 
-
-    idx_newbounce = idx_newbounce_start
+    idx_newbounce = idx_left_equator_safe
 
     while dz_sign[idx_newbounce] > 0 and idx_newbounce < len(dz_sign):
         idx_newbounce += 1
     if idx_newbounce >= len(dz_sign):
         print("Error: could not detect an equatorial crossing, particle is not bouncing as expected")
         return -1, -1, [], []
+    #print(idx_newbounce, len(dz_sign), idx_newbounce/len(dz_sign))
 
     while dz_sign[idx_newbounce] <= 0:
         idx_newbounce += 1
     if idx_newbounce >= len(dz_sign) and idx_newbounce < len(dz_sign):
         print("Error: could not detect a return to 0 bounce phase, particle is not bouncing as expected")
         return -1, -1, [], []
+    #print(idx_newbounce, len(dz_sign), idx_newbounce/len(dz_sign))
 
     capped_pt = list(tocap_pt[:idx_newbounce])
     capped_times = list(tocap_time[:idx_newbounce])
 
-
     # interpolate the (future) state vector at the equator:
     dpt = tocap_pt[idx_newbounce] - tocap_pt[idx_newbounce - 1]
     dz = dpt[2]
-    frac_dz = (tocap_pt_mageqator[idx_newbounce] - tocap_pt[idx_newbounce - 1][2]) / dz
+    frac_dz = (bfield.origin_MAG[2] - tocap_pt[idx_newbounce - 1][2]) / dz
     if frac_dz == 0:
         # we are already at the equator at idx_newbounce - 1 of the trajectory
         pt_eq = tocap_pt[idx_newbounce - 1]
@@ -323,6 +314,102 @@ def get_bouncecapped_trajectory(bfield, tocap_time, tocap_pt, tsperorbit, idx_ne
 
         capped_pt.append(pt_eq)
         capped_times.append(t_eq)
+
+    return t_eq, pt_eq, capped_times, capped_pt
+
+def converge_on_first_crossing_idx(xyz, ti, bfield, idx_jump, count_index = 0, time_direction = 1):
+    # find where dZ goes from negative to positive across the equator, this is where bounce phase gets reset
+    #print("checking from", count_index, ", jumping ", idx_jump)
+    zeq = bfield.find_magequator_z(*xyz[0][:3], ti[0])
+    dz_last = xyz[0][2] - zeq
+    idx = 0 #passed to the second recursive call below if this for loop is not entered because idx_jump >= len(xyz)
+    for idx in range(idx_jump, len(xyz), idx_jump):
+        zeq = bfield.find_magequator_z(*xyz[idx][:3], ti[idx])
+        dz = xyz[idx][2] - zeq
+        if dz_last * time_direction < 0 and dz * time_direction >= 0:
+            # forward in time: if dz_last is negative, dz is positive
+            if idx_jump == 1:
+                return count_index + idx
+            else:
+                #print(" somewhere between", count_index + idx - idx_jump, "and", count_index + idx)
+                return converge_on_first_crossing_idx(xyz[idx - idx_jump:], ti[idx - idx_jump:], bfield, idx_jump//2, count_index + idx - idx_jump, time_direction=time_direction)
+        else:
+            dz_last = dz
+
+    if idx_jump > 1:
+        return converge_on_first_crossing_idx(xyz[idx:], ti[idx:], bfield, idx_jump // 2, count_index + idx, time_direction=time_direction)
+    else:
+        return -1
+
+def get_bouncecapped_trajectory(bfield, tocap_time, tocap_pt, tsperorbit, idx_left_equator_safe = 0, reverse=False):
+    """
+    cap the trajectory to the soonest equatorial crossing at 0 bounce phase (negative to positive dZ relative to the magnetic equator)
+    if pt begins at dZ=0 and idx_left_equator_safe = 0, this function will return the first point in the trajectory
+     therefore set idx_left_equator_safe to a value s.t. the particle will not trip a bounce detection near the very beginning of its trajectory
+     this is a problem when the resolution of the magnetic equator is poor
+    input must be numpy arrays
+    returns floats, lists
+    """
+    global warned_grid_resolution
+
+    if bfield.B_grid:
+        dz_bounce = np.max(tocap_pt[:,2]) - np.min(tocap_pt[:,2])
+        dz_fieldres = bfield.field_dz
+        if dz_bounce < 0.5*dz_fieldres and not warned_grid_resolution:
+            print("Warning: bounce orbit scale height comparable to field dz, may not be able to detect a bounce")
+            warned_grid_resolution = True
+
+    # #diagnosis code:###########
+    # print("Finding magnetic equator numerically...")
+    # pt_plot = np.array(tocap_pt)
+    # t_plot = np.array(tocap_time)
+    # zeq_list = []
+    # idx_skip = tsperorbit
+    # for idx in range(0, len(pt_plot), idx_skip):
+    #     zeq_list.append(bfield.find_magequator_z(*pt_plot[idx][:3], t_plot[idx]))
+    # zeq_list = np.array(zeq_list)
+    # #
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots(1)
+    # ax.plot(pt_plot[:,1][::idx_skip], zeq_list, color='black', ls=':') #equator
+    # ax.scatter([pt_plot[:,1][0]], [pt_plot[:,2][0]],marker='x', s=10)
+    # #ax.scatter(pt_plot[:,1], pt_plot[:,2],marker='.', s=5)
+    # #ax.scatter([capped_pt[-1][0]], [capped_pt[-1][2]],marker='x', color='black')
+    # #ax.plot(pt_plot[:, 1], pt_plot[:, 2],color='black',lw=0.3)
+    # ax.plot(pt_plot[:, 1][idx_left_equator_safe:], pt_plot[:, 2][idx_left_equator_safe:], color='red', lw=0.3)
+    # plt.show()
+    # ###########################
+
+    if reverse:
+        time_direction = -1
+    else:
+        time_direction = 1
+    idx_x = converge_on_first_crossing_idx(tocap_pt[idx_left_equator_safe:], tocap_time[idx_left_equator_safe:], bfield, tsperorbit, time_direction=time_direction)
+    if idx_x < 0:
+        print("Error: could not detect a whole bounce")
+        sys.exit()
+    idx_x = idx_x + idx_left_equator_safe
+    capped_pt = list(tocap_pt[:idx_x])
+    capped_times = list(tocap_time[:idx_x])
+
+    # interpolate the (future) state vector at the equator:
+    dpt = tocap_pt[idx_x] - tocap_pt[idx_x - 1]
+    dz = dpt[2]
+    frac_dz = (bfield.origin_MAG[2] - tocap_pt[idx_x - 1][2]) / dz
+    if frac_dz == 0:
+        # we are already at the equator at idx_x - 1 of the trajectory
+        pt_eq = tocap_pt[idx_x - 1]
+        t_eq = tocap_time[idx_x - 1]
+    else:
+        pt_eq = tocap_pt[idx_x - 1] + dpt * frac_dz
+
+        # get the time between index 0 (final particle position) and the equatorial crossing:
+        dt = (tocap_time[idx_x] - tocap_time[idx_x - 1])
+        t_eq = tocap_time[idx_x - 1] + dt * frac_dz
+
+        capped_pt.append(pt_eq)
+        capped_times.append(t_eq)
+
     return t_eq, pt_eq, capped_times, capped_pt
 
 def extract_GC_only(particle, bfield, existing_skipeveryn=1):
@@ -342,11 +429,15 @@ def extract_GC_only(particle, bfield, existing_skipeveryn=1):
 
     # calculate the gyroradius assuming the Lorentz force is constant within a gyroorbit:
     rg0 = calc_rg(Y0_GC, bfield, particle)  # relativistically correct
-    particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit)
+    particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit, get_K=False)
     return 1
 
 def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, findK0 = False, storegc = False, reverse=False):
     global pusher
+    global warned_grid_resolution
+    warned_grid_resolution = False  # turn off this warning after one instance
+    planet = earth.Earth(bfield.year_dec)
+
     if (not particle.storetrack) and storegc:
         print("Error: cannot calculate the GC trajectory because the particle object elects not to store its track")
         print("","skipping...")
@@ -360,14 +451,12 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
     mu = particle.init_mu
     aeq = particle.init_alpha
     L = particle.init_L
-    
 
     t0 = 0.
 
-
     tsperorbit = particle.recommended_tsperorbit
     
-    #get initial position of the GC based on particle L in the MAG frame:
+    #get initial position of the GC based on L:
     x0_GC_MAG = bfield.calculate_initial_GC(particle.init_L, particle.iphase_drift)
 
     #get a possible initial momentum vector on the magnetic equator,
@@ -397,15 +486,15 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
 
     #energy = particle.derive_KE0(bfield)
 
-    # #calculate the mirror field strength:
+    #calculate the mirror field strength:
     Be = np.linalg.norm(B_GC)
     Bm_approx = Be / (sin(aeq)**2 )
     I_approx = L * RE* pt_tools.approx_Ya(aeq)
     K_approx = np.power(Bm_approx/G2T,0.5) * I_approx / RE
     particle.muenKalphaL[0,2] = K_approx #includes dipole approximation
 
-    #calculate (an estimate of) the time for one bounce period
-    tb_est = tb_estimate(np.linalg.norm(x0_GC_MAG - bfield.origin_MAG), np.linalg.norm(v0), aeq)
+    #calculate (a dipole estimate of) the time for one bounce period
+    tb_est_dipole = tb_estimate(np.linalg.norm(x0_GC_MAG - bfield.origin_MAG), np.linalg.norm(v0), aeq)
 
     t0_init = t0
     x0_init = x0
@@ -435,7 +524,7 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
     print(" speed           = {:.3f}c".format(np.linalg.norm(v0)/c))
     print(" x0              = {:.3f}, {:.3f}, {:.3f} RE".format(x0[0]/RE, x0[1]/RE, x0[2]/RE))
     print(" p0              = {:.3e}, {:.3e}, {:.3e} kgm/s".format(p0[0], p0[1], p0[2]))
-    print(" bounce time     ~ {:.3f}s".format(tb_est))
+    print(" bounce time     ~ {:.3f}s".format(tb_est_dipole))
     print("#")
 
     #
@@ -443,89 +532,92 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
     #
     particle.update(t0_init, [*x0_init, *p0_init])
 
-    # if nonmirroring:
-    dt_solve_increment = tb_est
-    #     t1 = t0_init
-    #     x1 = x0_init
-    #     p1 = p0_init
-    # else:
     #
     #   Track the particle to some phase along the bounce in a static field at t0:
     #
     print("Initialising fraction {:.3f} along the first bounce...".format(iphase_bounce))
-    if iphase_bounce > 1 or iphase_bounce < 0:
-        print("Skipping because bounce phase has been specified incorrectly (please specify 0 <= x <= 1)")
-        return 2
 
-    #modify the particle to keep the track:
+    #modify the particle to keep the track for our starting calculatings:
     storetrack_setting = particle.storetrack
     particle.update = particle.update_keep
 
     #use a static field at t0 to do this: we want to find where the particle would be at t0:
-    t1, x1, p1 = pusher(particle, bfield, 1.0/0.9 * tb_est, tsperorbit, t_limit_exact = False)#, freezefield = t0)
+    t1, x1, p1 = pusher(particle, bfield, 1.0/0.9 * tb_est_dipole, tsperorbit, t_limit_exact = False)#, freezefield = t0)
 
     #cut the trajectory down to exactly one bounce:
-    t_eq, pt_eq, capped_times, capped_pt = get_bouncecapped_trajectory(bfield, np.array(particle.times), np.array(particle.pt), tsperorbit=tsperorbit, idx_newbounce_start=1, reverse=reverse)
+    # assume the particle has left the equator from a position index of tsperorbit
+    t_eq, pt_eq, capped_times, capped_pt = get_bouncecapped_trajectory(bfield, np.array(particle.times), np.array(particle.pt), tsperorbit=tsperorbit, idx_left_equator_safe=tsperorbit, reverse=reverse)
     particle.times = list(capped_times)
     particle.pt = list(capped_pt)
-    #capok = cut_exact_bounce(particle, bfield, tsperorbit)
-    # if not capok:
-    #     print("Skipping: a bounce could not be numerically detected")
-    #     return 2
     if t_eq < 0:
         print("Skipping: a bounce could not be numerically detected")
         return 2
 
     #we now have an accurate, numerically-derived approximation of bounce time:
     tb_est = particle.times[-1]
+    dt_solve_increment = tb_est
 
     #find time at which the particle is iphase_bounce along the bounce
     start_time = tb_est * iphase_bounce
     start_idx = np.argmin(np.abs(particle.times - start_time))
+    #
+    # #just keep the section of trajectory after this time:
+    # t0_shift = particle.times[start_idx]
+    # particle.pt = particle.pt[start_idx:]
+    # particle.times = particle.times[start_idx:]
+    #
+    # #shift the particle times back so it started from t0:
+    # for idx in range(len(particle.times)):
+    #     particle.times[idx] -= t0_shift
+    #
+    #
+    # # this approach seems more efficient, but it is technically incorrect,
+    # # in a time-dependent field, there is no guarantee the motion we just solved will be repeated at a different time
+    # # therefore, we have to start again...
+    #derive the starting position from this partial bounce solution:
+    particle.pt = [particle.pt[start_idx]]
+    particle.times = [t0_init]
 
-    #just keep the section of trajectory after this time:
-    t0_shift = particle.times[start_idx]
-    particle.pt = particle.pt[start_idx:]
-    particle.times = particle.times[start_idx:]
-
-    #shift the particle times back so it started from t0:
-    for idx in range(len(particle.times)):
-        particle.times[idx] -= t0_shift
 
     #restore particle properties if necessary:
     if not storetrack_setting:
         particle.update = particle.update_discard
-        particle.times = [particle.times[-1]]
-        particle.pt = [particle.pt[-1]]
+        # particle.times = [particle.times[-1]]
+        # particle.pt = [particle.pt[-1]]
+
     #
     #
     #   bounce tracking finished
 
+    height = planet.get_height_above_surface(particle.pt[0][:3])
+    if not height:
+        print("Skipping because the particle was initialized below Earth's surface")
+        return 2
 
     #
     #   Option to solve for a specific duration:
     if duration_solve > 0:
-        if duration_solve < particle.times[-1]: #we already solved for long enough:
-            while particle.times[-1] > duration_solve:
-                particle.pop_track()
-        dt_solve_increment = duration_solve - particle.times[-1]
+        #if duration_solve < particle.times[-1]: #we already solved for long enough:
+        #    while particle.times[-1] > duration_solve:
+        #        particle.pop_track()
+        dt_solve_increment = duration_solve# - particle.times[-1]
 
 
     #
     #   SOLVE THE (REMAINING) PARTICLE TRAJECTORY:
     #
     print("Tracking...")
-    nbounces_stored_approx = (t1 - t0) / tb_est
     delta_az = 0
     while abs(delta_az) <= delta_az_solve and bfield.range_adequate:
         t1, x1, p1 = pusher(particle, bfield, dt_solve_increment, tsperorbit)
         delta_az += angle_between(x0, x1)
         x0 = x1
-        dt_solve_increment = tb_est #reset the dt incrememnt to bounce time, in case it started as a fraction of a bounce
         nbounces_stored_approx = (t1 - t0) / tb_est
-        
         if delta_az_solve > 0: print("","{:.2f}%".format(100*delta_az/(delta_az_solve))) #only works if dt_solve_increment << drift orbit time
-    
+
+    #if we wanted one drift orbit exactly
+    # we now are at one drift orbit +-dt_solve_increment
+    # instead, we could cap the orbit to one drift here...
 
     #
     #   FIND THE VALUE OF THE SECOND INVARIANT NEAR THE BEGINNING OF THE TRAJECTORY:
@@ -553,14 +645,14 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
             bfield.range_adequate = True
 
         if nbounces_stored_approx < 2:
-            print("Tracking an extra {} bounces for K calculation...".format(2 - nbounces_stored_approx))
+            print("Tracking an extra {:.2f} bounces for K calculation...".format(2 - nbounces_stored_approx))
             t1_extra, x1_extra, p1_extra = pusher(particle, bfield, (2 - nbounces_stored_approx)*tb_est, tsperorbit)
         
         if not bfield.range_adequate:
             print("Error: cannot find K near the beginning of the trajectory because the particle goes out of range")
         else:
             print("Calculating initial K...")
-            gc_bounce_time, gc_bounce_pos, K_, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = 2*tb_est)
+            _, _, K_, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit, tlimit = 2*tb_est)
             particle.muenKalphaL[0,2] = K_
 
         #using the same logic as above, restore the particle track if needed:
@@ -568,13 +660,13 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
             while particle.pop_track(stored_len): continue
             if storegc:
                 print("Calculating GC...")
-                particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit)
+                particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit, get_K=False)
         elif particle.storetrack:
             particle.times = stored_times
             particle.pt = stored_pt
             if storegc:
                 print("Calculating GC...")
-                particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit)
+                particle.gc_times, particle.gc_pos, _, _ = get_GC_from_track(rg0, bfield, particle, tsperorbit, get_K=False)
         else:
             particle.update = particle.update_discard
             particle.times = [t1]
@@ -582,12 +674,10 @@ def solve_trajectory(particle, bfield, delta_az_solve, duration_solve = -1, find
 
         bfield.range_adequate = bfield_range_ok_prior
 
- 
 
     if not bfield.range_adequate:
-        print("","tracking failed - particle went out of EM field range")
+        print("","tracking failed - particle went outside of field domain in time or space")
         return 2
-
 
     exect1 = time.perf_counter()
     print("","tracked with execution time of {:.2f}s".format(exect1 - exect0))
