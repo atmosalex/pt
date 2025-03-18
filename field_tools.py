@@ -5,6 +5,8 @@ import numpy as np
 import IGRF_tools
 from datetime import datetime, timezone
 from pt_tools import constants, dt_to_dec
+import sys
+from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
 
 # we work in the MAG frame because:
 #  we can transform between GEO and MAG using only three IGRF parameters (no IRBEM dependence, etc.)
@@ -19,9 +21,6 @@ def v_print(*a, **b):
         return
     print(*a, **b)
 
-pi = np.pi
-import sys
-from math import cos, sin, tan, acos, asin, atan, atan2, sqrt, pi, floor
 
 
 def get_rotation_GEO_to_MAG(year_dec):
@@ -103,6 +102,7 @@ class Dipolefield:
         self.field_time = [0]
         self.origin_MAG = get_eccentric_centre_MAG(year_dec)
         self.B_grid = False
+        self.range_adequate = True
 
     def get_dipolelc(self, Lb, atm_height):
         RE = constants.RE
@@ -164,6 +164,15 @@ class Dipolefield:
 
         return B0_, M_
 
+    def find_magequator(self, xs, ys, zs, ti):
+        x1_MAG = [xs, ys, zs]
+        L = self.get_L(x1_MAG)
+        MLTlon = self.get_aclockw_angle_around_dipole_z(x1_MAG)
+        xe = L * cos(MLTlon * np.pi / 180) * constants.RE
+        ye = L * sin(MLTlon * np.pi / 180) * constants.RE
+        ze = self.find_magequator_z(xs, ys, zs, ti)
+        return [xe, ye, ze]
+
     def find_magequator_z(self, xs, ys, zs, ti):
         #return z component of offset, eccentric dipole offset vector in the MAG frame
         return self.origin_MAG[2]
@@ -189,6 +198,105 @@ class Dipolefield:
         #what should be done here in the case of an arbitrary field?
         # the particle GC should be at the point of minimum B because we can prescribe equatorial pitch angle here
         return x0_GC_MAG
+
+    def find_surface_intersection(self, planet, xs, ys, zs, ti, trace_ds=0.75e-3 * constants.RE, force_direction=None, level = 0):#, return_tracepath=False):
+        """
+        xs, ys, zs is the starting point of the trace
+        """
+        max_level = 0
+
+        #tracepath = []
+        found_surface = False
+
+        #detect which direction we should trace the field line in first:
+        p0 = np.array([xs, ys, zs])
+        p1 = np.zeros(3)
+        B0 = self.getBE(*p0, ti)
+        absB0 = np.linalg.norm(B0[:3])
+        if force_direction is not None:
+            direction = force_direction
+            p1 = p0 + direction * trace_ds * B0 / absB0
+            B1 = self.getBE(*p1, ti)[:3]
+        else:
+            direction = 1
+            p1[0] = p0[0] + direction * trace_ds * B0[0] / absB0
+            p1[1] = p0[1] + direction * trace_ds * B0[1] / absB0
+            p1[2] = p0[2] + direction * trace_ds * B0[2] / absB0
+            B1 = self.getBE(*p1, ti)[:3]
+            absB1 = np.linalg.norm(B1)
+            if absB1 < absB0:
+                direction = direction * -1
+                p1[0] = p0[0] + direction * trace_ds * B0[0] / absB0
+                p1[1] = p0[1] + direction * trace_ds * B0[1] / absB0
+                p1[2] = p0[2] + direction * trace_ds * B0[2] / absB0
+                B1 = self.getBE(*p1, ti)[:3]
+                #absB1 = np.linalg.norm(B1)
+
+        while self.range_adequate:
+            #tracepath.append(np.array(p1))
+
+            pX = planet.land(p0, p1)
+            if pX is not None:
+                found_surface = True
+                break
+
+            #update point:
+            p0[:] = p1[:]
+            B0 = B1
+
+            p1[0] = p0[0] + direction * trace_ds * B0[0] / absB0
+            p1[1] = p0[1] + direction * trace_ds * B0[1] / absB0
+            p1[2] = p0[2] + direction * trace_ds * B0[2] / absB0
+            B1 = self.getBE(*p1, ti)
+
+        if found_surface:
+            return pX#, np.array(tracepath)
+        elif not found_surface and level < max_level:
+            return self.find_surface_intersection(xs, ys, zs, ti, trace_ds=trace_ds / 2, force_direction=force_direction, level=level + 1)#, return_tracepath=return_tracepath)
+        elif not found_equator:
+            print("error: could not find Earth's surface via field line tracing")
+            if not self.range_adequate: print(" query point:", xs, ys, zs, "out of range of BE field!")
+            # print(np.linalg.norm([xi, yi, zi])/constants.RE)
+            # t0_ts = 1420070400.0  # corresponds to 2015
+            # import earth
+            # t_datetime = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
+            # year_dec = dt_to_dec(t_datetime)
+            # planet = earth.Earth(year_dec)
+            # import matplotlib.pyplot as plt
+            # fig = plt.figure(figsize=(12, 6))
+            # ax = fig.add_subplot(111, projection='3d')
+            # tracepath = np.array(tracepath)#/constants.RE
+            # #print(tracepath[:,0])
+            # tracepath_plot = tracepath#[-50:]
+            # ax.plot(tracepath_plot[:,0], tracepath_plot[:,1], tracepath_plot[:,2], color='red')
+            # #ax.scatter([p0[0]], [p0[1]], [p0[2]], color='b')
+            # ax.scatter([xi], [yi], [zi], color='b')
+            #
+            # # your ellispsoid and center in matrix form
+            # A = planet.M_MAG#np.array([[1, 0, 0], [0, 2, 0], [0, 0, 2]])
+            # center = planet.c_MAG
+            # # find the rotation matrix and radii of the axes
+            # U, s, rotation = np.linalg.svd(A)
+            # radii = 1.0 / np.sqrt(s)
+            #
+            # u = np.linspace(0.0, 2.0 * np.pi, 100)
+            # v = np.linspace(0.0, np.pi, 100)
+            # x = radii[0] * np.outer(np.cos(u), np.sin(v))
+            # y = radii[1] * np.outer(np.sin(u), np.sin(v))
+            # z = radii[2] * np.outer(np.ones_like(u), np.cos(v))
+            # for i in range(len(x)):
+            #     for j in range(len(x)):
+            #         [x[i, j], y[i, j], z[i, j]] = np.dot([x[i, j], y[i, j], z[i, j]], rotation) + center
+            #
+            # ax.plot_wireframe(x, y, z, rstride=4, cstride=4, color='b', alpha=0.2)
+            # ax.set_aspect('equal', 'box')
+            # ax.set_xlabel("X")
+            # ax.set_ylabel("Y")
+            # ax.set_zlabel("Z")
+            # plt.show()
+            # sys.exit()
+
+            sys.exit()
 
 class Dipolefield_With_Perturbation(Dipolefield):
     def __init__(self, fileload, reversetime=-1):
@@ -246,7 +354,6 @@ class Dipolefield_With_Perturbation(Dipolefield):
 
         v_print("", "done\n")
 
-        self.range_adequate = True
 
     def int_field(self, xi, yi, zi, ti):
         ti = self.reversetime + self.tmult * ti
@@ -377,6 +484,7 @@ class Customfield(Dipolefield):
         self.field_dz = self.field_z[1] - self.field_z[0]
         self.field_z_min = self.field_z[0]
 
+        print("", "numerical resolution delta x, y, z [RE]:", self.field_dx/constants.RE, self.field_dy/constants.RE, self.field_dz/constants.RE)
         # store solutions:
         nt = np.size(self.field_time)
         nx = np.size(self.field_x)
@@ -445,7 +553,7 @@ class Customfield(Dipolefield):
         tfac = (ti - self.field_t_min - (pte0) * dt) / dt;
 
         ns = [0, 0, 0, 0, 0, 0, 0, 0]
-        interp_vals = [0, 0, 0]
+        interp_vals = [0, 0, 0, 0, 0, 0]
         t_idxs = [pte0, pte0 + 1]
         t_facs = [1 - tfac, tfac]
 
@@ -480,60 +588,114 @@ class Customfield(Dipolefield):
         """
         input: coordinates in m
         """
-        bx, by, bz = self.int_field(xh_MAG, yh_MAG, zh_MAG, t)
-        return bx, by, bz, 0, 0, 0
+        return self.int_field(xh_MAG, yh_MAG, zh_MAG, t)
 
-    def find_magequator(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE, level=0, direction=1):
+    def find_magequator(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE, level=0, direction=1):#, return_tracepath=False):
         """
         xs, ys, zs is the starting point of the trace
         """
-        max_level = 5
-        max_R = 10 * sqrt(xs ** 2 + ys ** 2 + zs ** 2)
-        xi = xs
-        yi = ys
-        zi = zs
+        max_level = 0
+        ps = np.array([xs, ys, zs])
+        pi = np.zeros(3)
+        pe = np.zeros(3)
+
+        #tracepath = []
         tried_reverse = False
         found_equator = False
 
-        Bvec = self.int_field(xi, yi, zi, ti)
+        Bvec = self.getBE(xs, ys, zs, ti)[:3]
         absB = np.linalg.norm(Bvec)
-        absB_min = absB
-        while sqrt(xi ** 2 + yi ** 2 + zi ** 2) < max_R:
-            xi += direction * trace_ds * Bvec[0] / absB
-            yi += direction * trace_ds * Bvec[1] / absB
-            zi += direction * trace_ds * Bvec[2] / absB
 
-            Bvec = self.int_field(xi, yi, zi, ti)
-            absB = np.linalg.norm(Bvec)
+        absB_min = absB
+
+        #go one step:
+        pi_last = np.array([xs, ys, zs])
+        pi[0] = ps[0] + direction * trace_ds * Bvec[0] / absB
+        pi[1] = ps[1] + direction * trace_ds * Bvec[1] / absB
+        pi[2] = ps[2] + direction * trace_ds * Bvec[2] / absB
+        Bvec = self.getBE(*pi, ti)[:3]
+        absB = np.linalg.norm(Bvec)
+
+        while self.range_adequate:
+            #tracepath.append(np.array(pi))
+
             if absB < absB_min:
                 absB_min = absB
                 tried_reverse = True #no need to try reversing if we are finding that field strength decreases in this direction
-            elif not tried_reverse:
+            # either we went past the equator, or...
+            elif not tried_reverse and np.allclose(pi_last, ps):
+                #...there is a possibility we are heading in the wrong direction:
                 # reset with negative step
-                xi = xs
-                yi = ys
-                zi = zs
+                pi[:] = ps[:]
+                #tracepath = []
                 direction = direction * -1
                 tried_reverse = True
-                #print("reversing...")
             else:
-                xe = xi
-                ye = yi
-                ze = zi
+                #go back to the last point
+                pe = pi_last
                 found_equator = True
                 break
+            #update point:
+            # we do this here so that self.range_adequate is updated before the condition is checked
+            pi_last[:] = pi[:]
+            pi[0] = pi[0] + direction * trace_ds * Bvec[0] / absB
+            pi[1] = pi[1] + direction * trace_ds * Bvec[1] / absB
+            pi[2] = pi[2] + direction * trace_ds * Bvec[2] / absB
+            Bvec = self.getBE(*pi, ti)[:3]
+            absB = np.linalg.norm(Bvec)
 
         if found_equator:
-            return xe, ye, ze
+            return pe#, np.array(tracepath)
         elif not found_equator and level < max_level:
-            return self.find_magequator(xs, ys, zs, ti, trace_ds=trace_ds / 2, level=level + 1)
+            return self.find_magequator(xs, ys, zs, ti, trace_ds=trace_ds / 2, level=level + 1)#, return_tracepath=return_tracepath)
         elif not found_equator:
             print("error: could not find the magnetic equator via field line tracing")
+            if not self.range_adequate: print(" query point:", xs, ys, zs, "out of range of BE field!")
+            # print(np.linalg.norm([xi, yi, zi])/constants.RE)
+            # t0_ts = 1420070400.0  # corresponds to 2015
+            # import earth
+            # t_datetime = datetime.fromtimestamp(t0_ts, tz=timezone.utc)
+            # year_dec = dt_to_dec(t_datetime)
+            # planet = earth.Earth(year_dec)
+            # import matplotlib.pyplot as plt
+            # fig = plt.figure(figsize=(12, 6))
+            # ax = fig.add_subplot(111, projection='3d')
+            # tracepath = np.array(tracepath)#/constants.RE
+            # #print(tracepath[:,0])
+            # tracepath_plot = tracepath#[-50:]
+            # ax.plot(tracepath_plot[:,0], tracepath_plot[:,1], tracepath_plot[:,2], color='red')
+            # #ax.scatter([p0[0]], [p0[1]], [p0[2]], color='b')
+            # ax.scatter([xi], [yi], [zi], color='b')
+            #
+            # # your ellispsoid and center in matrix form
+            # A = planet.M_MAG#np.array([[1, 0, 0], [0, 2, 0], [0, 0, 2]])
+            # center = planet.c_MAG
+            # # find the rotation matrix and radii of the axes
+            # U, s, rotation = np.linalg.svd(A)
+            # radii = 1.0 / np.sqrt(s)
+            #
+            # u = np.linspace(0.0, 2.0 * np.pi, 100)
+            # v = np.linspace(0.0, np.pi, 100)
+            # x = radii[0] * np.outer(np.cos(u), np.sin(v))
+            # y = radii[1] * np.outer(np.sin(u), np.sin(v))
+            # z = radii[2] * np.outer(np.ones_like(u), np.cos(v))
+            # for i in range(len(x)):
+            #     for j in range(len(x)):
+            #         [x[i, j], y[i, j], z[i, j]] = np.dot([x[i, j], y[i, j], z[i, j]], rotation) + center
+            #
+            # ax.plot_wireframe(x, y, z, rstride=4, cstride=4, color='b', alpha=0.2)
+            # ax.set_aspect('equal', 'box')
+            # ax.set_xlabel("X")
+            # ax.set_ylabel("Y")
+            # ax.set_zlabel("Z")
+            # plt.show()
+            # sys.exit()
+
             sys.exit()
 
     def find_magequator_z(self, xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE):
-        _, _, ze = self.find_magequator(xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE)
-        return ze
+        pe = self.find_magequator(xs, ys, zs, ti, trace_ds=0.75e-4 * constants.RE) #, _
+        return pe[2]
 
 
 class Customfield_With_Perturbation(Dipolefield):

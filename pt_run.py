@@ -339,32 +339,17 @@ for pt_id in tracklist_ID:
         resultfile_GC.update_dataset('tracklist_mu', tracklist_mu_changes, compressmethod=None, quiet=True)
 
         if checkcodes[pt_id] == 1: #if the track has been successfully calculated
-            #calculate initial momentum and relativistic mass:
-            x0_GC_MAG = bfield.calculate_initial_GC(particle.init_L, particle.iphase_drift)
-            B_GC = np.linalg.norm(bfield.getBE(*x0_GC_MAG, 0)[:3])
-            p0 = particle.calculate_initial_momentum(B_GC)
-            gamma = np.sqrt(1 + (np.linalg.norm(p0)/(particle.m0 * pt_tools.constants.c))**2)
-            massr = particle.m0#gamma*particle.m0
+            solved_times, solved_position = resultfile.read_track(pt_id, False)
 
-            times, position = resultfile.read_track(pt_id, False)
-            
-            #infer momentum from previously calculated trajectory:
-            velocity = (position[1:] - position[:-1])/(times[1:, np.newaxis] - times[:-1, np.newaxis])
-            gamma = 1.0/(np.sqrt(1-velocity*velocity/(pt_tools.constants.c**2)))
-            momentum = gamma * particle.m0 * velocity
-
-            times = times[:-1]
-            position = position[:-1]
-
-            particle.times = times
-            particle.pt = list(np.hstack((position, momentum)))
-            code_success = pt_fp.extract_GC_only(particle, bfield, existing_skipeveryn=skipeveryn)
+            code_success = pt_fp.extract_GC_only(particle, bfield, solved_times, solved_position, existing_skipeveryn=skipeveryn)
             particle.times = particle.gc_times
             particle.pt = particle.gc_pos
         else:
             print("Warning: could not extract GC for particle track ID {}".format(pt_id))
             code_success = checkcodes[pt_id]
 
+        #copy invariants from whatever they were in the original file:
+        particle.muenKalphaL = resultfile.read_invariants(pt_id)
 
         resultfile_GC.add_track(pt_id, particle, checkcode=code_success, compressmethod="gzip", skipeveryn=skipeveryn)
         count += 1

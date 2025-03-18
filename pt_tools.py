@@ -435,12 +435,12 @@ def coord_car_rz(x, y, z, dphi):
     return (cos(dphi) * x - sin(dphi) * y, sin(dphi) * x + cos(dphi) * y, z)
 
 class Proton_trace:
-    def __init__(self, mu, alpha, L, iphase_gyro=0, iphase_bounce=0, iphase_drift=0, storetrack = True):
+    def __init__(self, mu, alpha, L, iphase_gyro=0, iphase_bounce=0, iphase_drift=0, storetrack = True, tsperorbit=620):
         #proton properties:
         self.name = "proton"
         self.m0 = constants.mass0_proton
         self.q = constants.charge_proton
-        self.recommended_tsperorbit = 620 # "1/100 of the particle gyroperiod" - see 10.1002/2014JA020899
+        self.tsperorbit = tsperorbit # "1/100 of the particle gyroperiod" - see 10.1002/2014JA020899
 
         self.init_mu = mu
         self.init_alpha = alpha
@@ -501,44 +501,6 @@ class Proton_trace:
         self.times[-1] = time
         self.pt[-1] = state
 
-    # def cap_to_bounce(self, z_equator = 0, shift0 = 0):
-    #     """
-    #     this function finds the index after the last full bounce, using recursion
-    #     """
-    #
-    #     #positions = self.getpt()[:,:3]
-    #     zco = self.getpt()[shift0:,2]
-    #     shift1 = 0
-    #
-    #     #our process for integrating right up until z = 0 to get a full bounce may have caused a z < 0
-    #     while zco[shift1] < z_equator:
-    #         shift1 += 1
-    #         if shift1 == np.size(zco):
-    #             #v_print("Error: no bounce detected at all")
-    #             return shift0
-    #     #find out the index of the first z < 0:
-    #     idx_bounce_half = shift1 + ((zco[shift1:] < z_equator).argmax(axis=0))
-    #
-    #
-    #     if idx_bounce_half <= shift1:
-    #         #the first (shifted) position is definitely not below zero, therefore...
-    #         # we didn't even get half a bounce
-    #         #v_print("Error: didn't half bounce after", self.bounces, "bounces")
-    #         return shift0
-    #
-    #     idx_bounce_nexthalf = ((zco[idx_bounce_half:] > z_equator).argmax(axis=0))
-    #
-    #     if idx_bounce_nexthalf == 0:
-    #         #the first position is definitely not above zero, therefore...
-    #         # we didn't get another half bounce
-    #         #v_print("Error: didn't half bounce after", self.bounces, "bounces")
-    #         return shift0
-    #
-    #     shift1 = idx_bounce_half + idx_bounce_nexthalf + 1
-    #
-    #     return self.cap_to_bounce(z_equator=z_equator, shift0 = shift0 + shift1)
-
-
     def pop_track(self, requiredlen = 0):
         if len(self.pt) > requiredlen and len(self.times) > requiredlen:
             self.pt.pop()
@@ -547,7 +509,7 @@ class Proton_trace:
         else:
             return 0
 
-    def calculate_initial_momentum(self, B_GC):
+    def calculate_equatorial_p0(self, B_GC):
         """
         calculates a possible momentum vector on the equator given:
             the equatorial field
@@ -583,7 +545,7 @@ class Proton_trace:
         p0 = massr * v0
         return p0
         
-    def calculate_initial_position(self, x0_GC_MAG, rg):
+    def calculate_equatorial_x0(self, x0_GC_MAG, rg):
         step = [rg, 0, 0] #0 degrees
 
         #rotate the vector to the correct gyrophase:
@@ -601,7 +563,7 @@ class Proton_trace:
 
         B_GC = bfield.getBE(*x0_GC_MAG, t)[:3] #vector is invariant to changes in reference frame, i.e. same in MAG
 
-        p0 = self.calculate_initial_momentum(B_GC)
+        p0 = self.calculate_equatorial_p0(B_GC)
         p0mag = np.linalg.norm(p0)
 
         gamma = sqrt(1 + (p0mag/(self.m0 * constants.c))**2)
@@ -611,13 +573,12 @@ class Proton_trace:
         return E0_J
 
 class Electron_trace(Proton_trace):
-    def __init__(self, mu, alpha, L, iphase_gyro, iphase_bounce, iphase_drift,  storetrack = True):
-        super(Electron_trace, self).__init__(mu, alpha, L, iphase_gyro, iphase_bounce, iphase_drift, storetrack)
+    def __init__(self, mu, alpha, L, iphase_gyro, iphase_bounce, iphase_drift,  storetrack = True, tsperorbit = 100):
+        super(Electron_trace, self).__init__(mu, alpha, L, iphase_gyro, iphase_bounce, iphase_drift, storetrack, tsperorbit)
         #proton properties:
         self.name = "electron"
         self.m0 = constants.mass0_electron
         self.q = constants.charge_electron
-        self.recommended_tsperorbit = 100
 
 
 

@@ -21,7 +21,8 @@ class Earth:
         #WGS84 ellipsoid:
         M_GEO = np.array([[1/(WGS84.a**2),0,0],[0,1/(WGS84.a**2),0],[0,0,1/(WGS84.b**2)]])
         #rotate the WGS84 ellipsoid from GEO to MAG:
-        self.M_MAG = np.matmul(field_tools.get_rotation_GEO_to_MAG(year_dec), M_GEO)
+        R_G2M = field_tools.get_rotation_GEO_to_MAG(year_dec)
+        self.M_MAG = R_G2M @ M_GEO @ R_G2M.T
         # this is Earth's surface in the MAG frame
         self.c_MAG = np.zeros(3)
 
@@ -116,6 +117,7 @@ class Earth:
     #     return pX
     def land(self, p0, p1):
         """
+        p0 and p1 must be numpy arrays
         calculate the intersection point pX between p0 and p1 at Earth's surface, if there is one
         warning: this function assumes that p0 is above Earth's surface!
 
@@ -131,7 +133,7 @@ class Earth:
         #tangent to particle trajectory:
         l = (p1 - p0)
         lmag = np.linalg.norm(l)
-        lnorm = l / np.linalg.norm(l)
+        lnorm = l / lmag
 
         #calculate the intersection point of the tangent and ellipsoid:
         # if p0 is above the surface, and p1 at or below the surface, there are one or two positive solutions for lambda
@@ -142,5 +144,5 @@ class Earth:
             sol_nearest = min(sol)
             if sol_nearest > 0 and sol_nearest < lmag:
                 #must be positive aiming from p0 to p1, must be smaller than lmag to be between p0 and p1
-                pX = p0 + sol_nearest * l
+                pX = p0 + sol_nearest * lnorm
         return pX

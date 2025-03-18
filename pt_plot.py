@@ -535,11 +535,11 @@ tracklist = resultfile.get_existing_tracklist()
 plotname = os.path.basename(fileh5[:-3])
 maxn = -1
 
-print("Printing 3D overview, click and drag to move around...")
-plot_positions(resultfile, ptids, view_ele = 0, view_azi = -71)
-print()
-print("quitting...")
-sys.exit()
+# print("Printing 3D overview, click and drag to move around...")
+# plot_positions(resultfile, ptids, view_ele = 0, view_azi = -71)
+# print()
+# print("quitting...")
+# sys.exit()
 
 def print_invariants(ptids, resultfile):
     fmt_str = "M={:.2f}; E={:.2f}MeV, K={:.2f}G^0.5RE, aeq={:.2f}d, L={:.2f}, phi_g={:.2f}, phi_b={:.2f}, phi_d={:.3f}"
@@ -563,6 +563,7 @@ def print_invariants(ptids, resultfile):
                 print("", "", fmt_str.format(*muenKalphaL1))
         else:
             print("", "", "invariants not stored")
+
 print("Plotting changes to invariants...")
 axlims = plot_invariants(resultfile, ptids, tracklist, filename=os.path.join(dirname,"{}_Figure_adiabatics.png".format(plotname)),
     maxn=maxn,
